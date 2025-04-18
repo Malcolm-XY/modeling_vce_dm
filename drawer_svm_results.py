@@ -21,7 +21,7 @@ data = {
 }
 
 # 绘图
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(12, 8))
 for method, accuracies in data.items():
     plt.plot(rates, accuracies, marker='o', label=method)
 

@@ -113,80 +113,205 @@ def example_usage():
     results.to_excel(output_path, index=True, sheet_name='Comparison Results')
 
 def example_usage_():
-    import utils
-    # ranking and channel selection method
-    ranking = utils.get_ranking()
-    
-    rank_method, channel_selection = 'label_driven_mi', 0.25    
-    
+    import feature_engineering
+    from utils import utils_feature_loading
+    from utils import utils_visualization
     # labels
-    y = utils.read_labels(dataset='seed')    
+    y = utils_feature_loading.read_labels(dataset='seed')    
+    
+    # VCE model
+    import vce_modeling
+    _, distance_matrix = feature_engineering.compute_distance_matrix('seed',
+        'euclidean', stereo_params={'prominence': 0.5, 'epsilon': 0.01}, visualize=True)
+    distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
+    utils_visualization.draw_projection(distance_matrix)
+    
+    factor_matrix = vce_modeling.compute_volume_conduction_factors(distance_matrix, 
+                                                                   'sigmoid', {'mu': 2.0, 'beta': 1.0})
+    factor_matrix_normalized = feature_engineering.normalize_matrix(factor_matrix)
+    utils_visualization.draw_projection(factor_matrix_normalized)
     
     # features
-    x = utils.load_cfs_seed('sub1ex1', 'de_LDS', 'joint')
-    channels_selected = ranking[rank_method][:int(len(ranking)*channel_selection)]
+    features = utils_feature_loading.read_fcs_mat('seed', 'sub1ex1', 'pcc')
+    alpha = features['alpha']
+    beta = features['beta']
+    gamma = features['gamma']
     
-    x_selected = x[:,:,channels_selected]
-    x_selected = x_selected.reshape(len(x_selected),-1)
+    tril_indices = np.tril_indices(62)
+    alpha_lower = alpha[:, tril_indices[0], tril_indices[1]]
+    beta_lower = beta[:, tril_indices[0], tril_indices[1]]
+    gamma_lower = gamma[:, tril_indices[0], tril_indices[1]]
+    
+    x = np.hstack((alpha_lower, beta_lower, gamma_lower))
+    
+    # recovered features
+    alpha_recovered = alpha - factor_matrix_normalized
+    beta_recovered = beta - factor_matrix_normalized
+    gamma_recovered = gamma - factor_matrix_normalized
+    
+    tril_indices = np.tril_indices(62)
+    alpha_recovered_lower = alpha_recovered[:, tril_indices[0], tril_indices[1]]
+    beta_recovered_lower = beta_recovered[:, tril_indices[0], tril_indices[1]]
+    gamma_recovered_lower = gamma_recovered[:, tril_indices[0], tril_indices[1]]
+    
+    x_recovered = np.hstack((alpha_recovered_lower, beta_recovered_lower, gamma_recovered_lower))
     
     # SVM Evaluation
-    svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
+    svm_results = k_fold_cross_validation_ml(x, y, k_folds=5, model_type='svm')
+    svm_results_ = k_fold_cross_validation_ml(x_recovered, y, k_folds=5, model_type='svm')
     
-    return svm_results
+    return svm_results, svm_results_
     
-if __name__ == '__main__':
-    import drawer_channel_weight
-    from utils import utils_feature_loading
-
-    # ranking and channel selection method
-    ranking = np.array(drawer_channel_weight.get_index('modeled_g_gaussian'))
-    channel_selection = 0.2
-
+def valid_all_subjects():
+    import feature_engineering
+    import vce_modeling
+    from utils import utils_feature_loading, utils_visualization
+    
     # labels
-    y = np.array(utils_feature_loading.read_labels(dataset='seed')).reshape(-1)
+    y = utils_feature_loading.read_labels(dataset='seed')
+    
+    # VCE model: distance matrix & factor matrix
+    _, distance_matrix = feature_engineering.compute_distance_matrix(
+        'seed', 'euclidean', stereo_params={'prominence': 0.5, 'epsilon': 0.01}, visualize=True)
+    distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
+    utils_visualization.draw_projection(distance_matrix)
+    
+    factor_matrix = vce_modeling.compute_volume_conduction_factors(
+        distance_matrix, 'sigmoid', {'mu': 2.0, 'beta': 1.0})
+    factor_matrix_normalized = feature_engineering.normalize_matrix(factor_matrix)
+    utils_visualization.draw_projection(factor_matrix_normalized)
 
-    # 获取需要选择的通道
-    channels_selected = ranking[:int(len(ranking) * channel_selection)].tolist()
+    tril_indices = np.tril_indices(62)
 
-    # 存储结果
-    all_results = []
+    all_results_original = []
+    all_results_recovered = []
 
-    # 遍历所有 subject (sub1-sub15) 和 experiment (ex1-ex3)
-    for sub_id in range(1, 16):
-        for ex_id in range(1, 4):
-            subject = f'sub{sub_id}'
-            experiment = f'ex{ex_id}'
-            print(f'Processing: {subject} {experiment}')
-
-            # 读取特征
-            x = utils_feature_loading.read_cfs('seed', f'{subject}{experiment}', 'de_LDS', 'joint')
+    for sub in range(1, 16):
+        for ex in range(1, 4):
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
             
-            bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # or: list(x.keys())
-            band_arrays = [x[band] for band in bands]  # 每个是 Point x Channel
-            
-            # 先堆成 Band x Point x Channel，再转置成 Point x Band x Channel
-            x_array = np.stack(band_arrays, axis=0)  # shape: (Band, Point, Channel)
-            x_array = np.transpose(x_array, (1, 0, 2))  # shape: (Point, Band, Channel)
-            
-            # 选择通道
-            x_selected = x_array[:, :, channels_selected]
-            x_selected = x_selected.reshape(len(x_selected), -1)
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, 'pcc')
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+
+            # Original features
+            alpha_lower = alpha[:, tril_indices[0], tril_indices[1]]
+            beta_lower = beta[:, tril_indices[0], tril_indices[1]]
+            gamma_lower = gamma[:, tril_indices[0], tril_indices[1]]
+            x = np.hstack((alpha_lower, beta_lower, gamma_lower))
+
+            # Recovered features
+            alpha_recovered = alpha - factor_matrix_normalized
+            beta_recovered = beta - factor_matrix_normalized
+            gamma_recovered = gamma - factor_matrix_normalized
+            alpha_recovered_lower = alpha_recovered[:, tril_indices[0], tril_indices[1]]
+            beta_recovered_lower = beta_recovered[:, tril_indices[0], tril_indices[1]]
+            gamma_recovered_lower = gamma_recovered[:, tril_indices[0], tril_indices[1]]
+            x_recovered = np.hstack((alpha_recovered_lower, beta_recovered_lower, gamma_recovered_lower))
 
             # SVM Evaluation
-            svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
-            all_results.append(svm_results)  # 存储字典
+            svm_results = k_fold_cross_validation_ml(x, y, k_folds=5, model_type='svm')
+            svm_results_recovered = k_fold_cross_validation_ml(x_recovered, y, k_folds=5, model_type='svm')
 
-    # 提取所有结果的键
-    result_keys = all_results[0].keys()
+            all_results_original.append(svm_results)           
+            all_results_recovered.append(svm_results_recovered)
+        
+    # Avg results
+    result_original_keys = all_results_original[0].keys()
+    avg_results_original = {key: np.mean([res[key] for res in all_results_original]) for key in result_original_keys}
+    print(f'Average SVM Results (CM): {avg_results_original}')
+    
+    result_recovered_keys = all_results_recovered[0].keys()
+    avg_results_recovered = {key: np.mean([res[key] for res in all_results_recovered]) for key in result_recovered_keys}
+    print(f'Average SVM Results (Recovered CM): {avg_results_recovered}')
+    
+    # Save to CSV
+    df_results_original = pd.DataFrame(all_results_original)
+    df_results_original.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in range(1,16) for j in range(1,4)])
+    df_results_original.loc["Average"] = ["Average"] + list(avg_results_original.values())
+    df_results_original.to_csv("svm_results_CM.csv", index=False)
+    
+    df_results_recovered = pd.DataFrame(all_results_recovered)
+    df_results_recovered.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in range(1,16) for j in range(1,4)])
+    df_results_recovered.loc["Average"] = ["Average"] + list(avg_results_recovered.values())
+    df_results_recovered.to_csv("svm_results_RCM.csv", index=False)
+        
+    return all_results_original, all_results_recovered
 
-    # 计算每个指标的平均值
-    avg_results = {key: np.mean([res[key] for res in all_results]) for key in result_keys}
+if __name__ == '__main__':
+    import feature_engineering
+    import vce_modeling
+    from utils import utils_feature_loading, utils_visualization
+    
+    # labels
+    y = utils_feature_loading.read_labels(dataset='seed')
+    
+    # VCE model: distance matrix & factor matrix
+    _, distance_matrix = feature_engineering.compute_distance_matrix(
+        'seed', 'euclidean', stereo_params={'prominence': 0.5, 'epsilon': 0.01}, visualize=True)
+    distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
+    utils_visualization.draw_projection(distance_matrix)
+    
+    factor_matrix = vce_modeling.compute_volume_conduction_factors(
+        distance_matrix, 'sigmoid', {'mu': 2.0, 'beta': 1.0})
+    factor_matrix_normalized = feature_engineering.normalize_matrix(factor_matrix)
+    utils_visualization.draw_projection(factor_matrix_normalized)
 
-    # 输出最终平均结果
-    print(f'Average SVM Results: {avg_results}')
+    tril_indices = np.tril_indices(62)
 
-    # 保存到 CSV
-    df_results = pd.DataFrame(all_results)
-    df_results.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in range(1,16) for j in range(1,4)])
-    df_results.loc["Average"] = ["Average"] + list(avg_results.values())
-    df_results.to_csv("svm_results.csv", index=False)
+    all_results_original = []
+    all_results_recovered = []
+
+    for sub in range(1, 16):
+        for ex in range(1, 4):
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
+            
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, 'plv')
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+
+            # Original features
+            alpha_lower = alpha[:, tril_indices[0], tril_indices[1]]
+            beta_lower = beta[:, tril_indices[0], tril_indices[1]]
+            gamma_lower = gamma[:, tril_indices[0], tril_indices[1]]
+            x = np.hstack((alpha_lower, beta_lower, gamma_lower))
+
+            # Recovered features
+            alpha_recovered = alpha - factor_matrix_normalized
+            beta_recovered = beta - factor_matrix_normalized
+            gamma_recovered = gamma - factor_matrix_normalized
+            alpha_recovered_lower = alpha_recovered[:, tril_indices[0], tril_indices[1]]
+            beta_recovered_lower = beta_recovered[:, tril_indices[0], tril_indices[1]]
+            gamma_recovered_lower = gamma_recovered[:, tril_indices[0], tril_indices[1]]
+            x_recovered = np.hstack((alpha_recovered_lower, beta_recovered_lower, gamma_recovered_lower))
+
+            # SVM Evaluation
+            svm_results = k_fold_cross_validation_ml(x, y, k_folds=5, model_type='svm')
+            svm_results_recovered = k_fold_cross_validation_ml(x_recovered, y, k_folds=5, model_type='svm')
+
+            all_results_original.append(svm_results)           
+            all_results_recovered.append(svm_results_recovered)
+        
+    # Avg results
+    result_original_keys = all_results_original[0].keys()
+    avg_results_original = {key: np.mean([res[key] for res in all_results_original]) for key in result_original_keys}
+    print(f'Average SVM Results (CM): {avg_results_original}')
+    
+    result_recovered_keys = all_results_recovered[0].keys()
+    avg_results_recovered = {key: np.mean([res[key] for res in all_results_recovered]) for key in result_recovered_keys}
+    print(f'Average SVM Results (Recovered CM): {avg_results_recovered}')
+    
+    # Save to CSV
+    df_results_original = pd.DataFrame(all_results_original)
+    df_results_original.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in range(1,16) for j in range(1,4)])
+    df_results_original.loc["Average"] = ["Average"] + list(avg_results_original.values())
+    df_results_original.to_csv("svm_results_CM.csv", index=False)
+    
+    df_results_recovered = pd.DataFrame(all_results_recovered)
+    df_results_recovered.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in range(1,16) for j in range(1,4)])
+    df_results_recovered.loc["Average"] = ["Average"] + list(avg_results_recovered.values())
+    df_results_recovered.to_csv("svm_results_RCM.csv", index=False)
