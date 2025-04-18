@@ -18,7 +18,6 @@ import joblib
 
 from utils import utils_feature_loading, utils_visualization, utils_eeg_loading
 
-
 # %% Filter EEG
 def filter_eeg(eeg, freq=128, verbose=False):
     """
@@ -151,95 +150,185 @@ def filter_eeg_and_save_circle(dataset, subject_range, experiment_range=None, ve
         raise ValueError("Error of unexpected subject or experiment range designation.")
 
 # %% Feature Engineering
-def compute_distance_matrix(dataset, method='euclidean', normalize=False, normalization_method='minmax',
-                            stereo_params=None, visualize=False):
+def compute_distance_matrix(dataset, normalize=False,
+                            normalization_method='minmax', projection_params=None,
+                            visualize=True):
     """
-    计算电极之间的距离矩阵，支持多种距离计算方法。
+    使用指定投影方法将EEG电极坐标从3D投影到2D平面，并计算距离矩阵。
 
     Args:
-        dataset (str): 数据集名称，用于读取分布信息。
-        method (str, optional): 距离计算方法，可选值为'euclidean'或'stereo'。默认为'euclidean'。
-            - 'euclidean': 直接计算3D空间中的欧几里得距离
-            - 'stereo': 首先进行立体投影到2D平面，然后计算投影点之间的欧几里得距离
-        normalize (bool, optional): 是否对距离矩阵进行归一化。默认为False。
-        normalization_method (str, optional): 归一化方法，可选值见normalize_matrix函数。默认为'minmax'。
-        stereo_params (dict, optional): 立体投影的参数，仅当method='stereo'时使用。默认为None，此时使用默认参数。
-            可包含以下键值对：
-            - 'prominence': 投影的突出参数，默认为0.1
-            - 'epsilon': 防止除零的小常数，默认为0.01
+        dataset (str): 数据集名称，用于读取电极坐标。
+        normalize (bool): 是否对输出距离矩阵归一化。
+        normalization_method (str): 使用的归一化方法。
+        projection_params (dict): 投影参数，包含以下字段：
+            - 'type': 'stereo' 或 'azimuthal'
+            - 'focal_length': stereo 参数
+            - 'max_scaling': stereo 参数
+            - 'y_compression_factor': float, y轴压缩/拉伸因子（默认1.0）
+            - 'y_compression_direction': 'positive' 或 'negative'，仅作用一侧
+        visualize (bool): 是否显示投影图。
 
     Returns:
-        tuple: 包含以下元素:
-            - channel_names (list): 通道名称列表
-            - distance_matrix (numpy.ndarray): 原始或归一化后的距离矩阵
+        tuple: (channel_names, distance_matrix)
     """
-    import numpy as np
+    projection_type = projection_params.get('type', 'stereo') if projection_params else 'stereo'
 
-    # 读取电极分布信息
+    # 读取电极数据
     distribution = utils_feature_loading.read_distribution(dataset)
     channel_names = distribution['channel']
     x, y, z = np.array(distribution['x']), np.array(distribution['y']), np.array(distribution['z'])
 
-    # 设置立体投影的默认参数
-    default_stereo_params = {
-        'prominence': 0.1,
-        'epsilon': 0.01
-    }
+    if projection_type == 'stereo':
+        focal_length = projection_params.get('focal_length', 1.0)
+        max_scaling = projection_params.get('max_scaling', 5.0)
+        epsilon = 1e-6
 
-    # 如果提供了stereo_params，更新默认参数
-    if stereo_params is not None:
-        default_stereo_params.update(stereo_params)
+        z_norm = (z - np.min(z)) / (np.max(z) - np.min(z))
+        scaling = focal_length / (focal_length - z_norm + epsilon)
+        scaling = np.clip(scaling, 0, max_scaling)
 
-    if method == 'euclidean':
-        # 计算3D欧几里得距离
-        coords = np.vstack((x, y, z)).T  # 形状 (N, 3)
-        diff = coords[:, np.newaxis, :] - coords[np.newaxis, :, :]
-        distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
+        x_proj = x * scaling
+        y_proj = y * scaling
 
-    elif method == 'stereo':
-        # 执行立体投影
-        prominence = default_stereo_params['prominence']
-        epsilon = default_stereo_params['epsilon']
+    elif projection_type == 'azimuthal':
+        coords = np.vstack((x, y, z)).T.astype(np.float64)
+        coords /= np.linalg.norm(coords, axis=1, keepdims=True)
+        x_unit, y_unit, z_unit = coords[:, 0], coords[:, 1], coords[:, 2]
 
-        # 归一化z坐标并应用prominence参数
-        z_norm = (z - np.min(z)) / (np.max(z) - np.min(z)) - prominence
+        theta = np.arccos(z_unit)
+        phi = np.arctan2(y_unit, x_unit)
 
-        # 计算投影坐标
-        x_proj = x / (1 - z_norm + epsilon)
-        y_proj = y / (1 - z_norm + epsilon)
+        x_proj = theta * np.cos(phi)
+        y_proj = theta * np.sin(phi)
+    else:
+        raise ValueError(f"未知的投影类型: {projection_type}")
 
-        # 归一化投影坐标
-        x_norm = (x_proj - np.min(x_proj)) / (np.max(x_proj) - np.min(x_proj))
-        y_norm = (y_proj - np.min(y_proj)) / (np.max(y_proj) - np.min(y_proj))
+    # === 归一化投影坐标 ===
+    x_norm = (x_proj - np.min(x_proj)) / (np.max(x_proj) - np.min(x_proj))
+    y_norm = (y_proj - np.min(y_proj)) / (np.max(y_proj) - np.min(y_proj))
 
-        # 将投影后的2D坐标堆叠成矩阵
-        proj_coords = np.vstack((x_norm, y_norm)).T  # 形状 (N, 2)
+    # === Azimuthal 特有：仅单侧压缩 y 轴 ===
+    if projection_type == 'azimuthal':
+        y_compression_factor = projection_params.get('y_compression_factor', 1.0)
+        y_compression_direction = projection_params.get('y_compression_direction', 'positive')
 
-        # 计算投影点之间的2D欧几里得距离
-        diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
-        distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
-        
-        if visualize:
-            plt.figure(figsize=(6, 6))
-            plt.scatter(x_norm, y_norm, c='blue')
-            for i, name in enumerate(channel_names):
-                plt.text(x_norm[i], y_norm[i], name, fontsize=8, ha='right', va='bottom')
-            plt.title(f"Stereo Projection (nonlinear z, prominence={prominence}, epsilon={epsilon})")
-            plt.xlabel("x")
-            plt.ylabel("y")
-            plt.axis("equal")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.show()
-    
-        # 计算投影点之间的2D欧几里得距离
-        diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
-        distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
+        if y_compression_factor != 1.0:
+            y_offset = y_norm - 0.5
+            if y_compression_direction == 'positive':
+                y_offset[y_offset > 0] *= y_compression_factor  # 仅上半区压缩/伸展
+            elif y_compression_direction == 'negative':
+                y_offset[y_offset < 0] *= y_compression_factor  # 仅下半区压缩/伸展
+            y_norm = 0.5 + y_offset
+
+    # 合并投影坐标
+    proj_coords = np.vstack((x_norm, y_norm)).T
+
+    if visualize:
+        plt.figure(figsize=(6, 6))
+        plt.scatter(x_norm, y_norm, c='blue')
+        for i, name in enumerate(channel_names):
+            plt.text(x_norm[i], y_norm[i], name, fontsize=8, ha='right', va='bottom')
+        plt.title(f"Projection: {projection_type}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.axis("equal")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    # === 计算距离矩阵 ===
+    diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
+    distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
+
+    if normalize:
+        distance_matrix = normalize_matrix(distance_matrix, method=normalization_method)
+
+    return channel_names, distance_matrix
+
+def compute_distance_matrix_(dataset, normalize=False,
+                            normalization_method='minmax', projection_params=None,
+                            visualize=True):
+    """
+    使用指定投影方法将EEG电极坐标从3D投影到2D平面，并计算距离矩阵。
+
+    Args:
+        dataset (str): 数据集名称，用于读取电极坐标。
+        method (str): 投影方法，唯一可选值为 'projection'。
+        normalize (bool): 是否对输出距离矩阵归一化。
+        normalization_method (str): 使用的归一化方法。
+        projection_params (dict): 投影参数，包含以下字段：
+            - 'type': 'stereo' 或 'azimuthal'
+            - 'focal_length': 焦距，仅对 'stereo' 有效
+            - 'max_scaling': 最大缩放因子，仅对 'stereo' 有效
+        visualize (bool): 是否显示投影图。
+
+    Returns:
+        tuple: (channel_names, distance_matrix)
+    """
+    projection_type = projection_params.get('type', 'stereo') if projection_params else 'stereo'
+
+    # 读取电极数据
+    distribution = utils_feature_loading.read_distribution(dataset)
+    channel_names = distribution['channel']
+    x, y, z = np.array(distribution['x']), np.array(distribution['y']), np.array(distribution['z'])
+
+    if projection_type == 'stereo':
+        focal_length = projection_params.get('focal_length', 1.0)
+        max_scaling = projection_params.get('max_scaling', 5.0)
+        epsilon = 1e-6
+
+        z_norm = (z - np.min(z)) / (np.max(z) - np.min(z))
+        scaling = focal_length / (focal_length - z_norm + epsilon)
+        scaling = np.clip(scaling, 0, max_scaling)
+
+        x_proj = x * scaling
+        y_proj = y * scaling
+
+    elif projection_type == 'azimuthal':
+        coords = np.vstack((x, y, z)).T.astype(np.float64)
+        coords /= np.linalg.norm(coords, axis=1, keepdims=True)
+        x_unit, y_unit, z_unit = coords[:, 0], coords[:, 1], coords[:, 2]
+
+        theta = np.arccos(z_unit)
+        phi = np.arctan2(y_unit, x_unit)
+
+        x_proj = theta * np.cos(phi)
+        y_proj = theta * np.sin(phi)
+
+        # === 自定义 y 方向压缩 ===
+        y_compression_factor = projection_params.get('y_compression_factor', 1.0)
+        y_compression_direction = projection_params.get('y_compression_direction', 'positive')
+
+        if y_compression_direction == 'negative':
+            y_proj = -y_proj * y_compression_factor
+        else:
+            y_proj = y_proj * y_compression_factor
 
     else:
-        raise ValueError(f"不支持的距离计算方法: {method}，可选值为'euclidean'或'stereo'")
+        raise ValueError(f"未知的投影类型: {projection_type}")
 
-    # 对距离矩阵进行归一化（如果需要）
+    # 归一化投影坐标
+    x_norm = (x_proj - np.min(x_proj)) / (np.max(x_proj) - np.min(x_proj))
+    y_norm = (y_proj - np.min(y_proj)) / (np.max(y_proj) - np.min(y_proj))
+    proj_coords = np.vstack((x_norm, y_norm)).T
+
+    if visualize:
+        plt.figure(figsize=(6, 6))
+        plt.scatter(x_norm, y_norm, c='blue')
+        for i, name in enumerate(channel_names):
+            plt.text(x_norm[i], y_norm[i], name, fontsize=8, ha='right', va='bottom')
+        plt.title(f"Projection: {projection_type}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.axis("equal")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    # 计算距离矩阵
+    diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
+    distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
+
     if normalize:
         distance_matrix = normalize_matrix(distance_matrix, method=normalization_method)
 
@@ -749,79 +838,81 @@ def compute_averaged_fcnetwork(feature, subjects=range(1, 16), experiments=range
         for experiment in experiments:  # 假设 experiments 是整数
             identifier = f"sub{subject}ex{experiment}"
             print(identifier)
-            try:
-                # 加载数据
-                cmdata_alpha = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
-                                                              band='alpha')
-                cmdata_beta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
-                                                             band='beta')
-                cmdata_gamma = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
-                                                              band='gamma')
-                cmdata_delta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
-                                                              band='delta')
-                cmdata_theta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
-                                                              band='theta')
+            
+            cmdata_alpha = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
+                                                          band='alpha')
+            cmdata_beta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
+                                                         band='beta')
+            cmdata_gamma = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
+                                                          band='gamma')
+            cmdata_delta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
+                                                          band='delta')
+            cmdata_theta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
+                                                          band='theta')
 
-                # 计算平均值
-                cmdata_alpha_averaged = np.mean(cmdata_alpha, axis=0)
-                cmdata_beta_averaged = np.mean(cmdata_beta, axis=0)
-                cmdata_gamma_averaged = np.mean(cmdata_gamma, axis=0)
-                cmdata_delta_averaged = np.mean(cmdata_delta, axis=0)
-                cmdata_theta_averaged = np.mean(cmdata_theta, axis=0)
+            # de_1=utils_feature_loading.read_cfs('seed', 'sub1ex1', 'de_LDS')['gamma']
+            # de_1 = np.mean(de_1, axis=0)
+            # de_10=utils_feature_loading.read_cfs('seed', 'sub10ex1', 'de_LDS')['gamma']
+            # de_10 = np.mean(de_10, axis=0)
 
-                # 累积数据
-                all_alpha_values.append(cmdata_alpha_averaged)
-                all_beta_values.append(cmdata_beta_averaged)
-                all_gamma_values.append(cmdata_gamma_averaged)
-                all_delta_values.append(cmdata_delta_averaged)
-                all_theta_values.append(cmdata_theta_averaged)
+            # 计算平均值
+            cmdata_alpha_averaged = np.mean(cmdata_alpha, axis=0)
+            cmdata_beta_averaged = np.mean(cmdata_beta, axis=0)
+            cmdata_gamma_averaged = np.mean(cmdata_gamma, axis=0)
+            cmdata_delta_averaged = np.mean(cmdata_delta, axis=0)
+            cmdata_theta_averaged = np.mean(cmdata_theta, axis=0)
 
-                # 合并同 subject 同 experiment 的数据
-                cmdata_averages_dict.append({
-                    "subject": subject,
-                    "experiment": experiment,
-                    "averages": {
-                        "alpha": cmdata_alpha_averaged,
-                        "beta": cmdata_beta_averaged,
-                        "gamma": cmdata_gamma_averaged,
-                        "delta": cmdata_delta_averaged,
-                        "theta": cmdata_theta_averaged
-                    }
-                })
-            except Exception as e:
-                print(f"Error processing sub {subject} ex {experiment}: {e}")
+            # 累积数据
+            all_alpha_values.append(cmdata_alpha_averaged)
+            all_beta_values.append(cmdata_beta_averaged)
+            all_gamma_values.append(cmdata_gamma_averaged)
+            all_delta_values.append(cmdata_delta_averaged)
+            all_theta_values.append(cmdata_theta_averaged)
+
+            # 合并同 subject 同 experiment 的数据
+            cmdata_averages_dict.append({
+                "subject": subject,
+                "experiment": experiment,
+                "averages": {
+                    "alpha": cmdata_alpha_averaged,
+                    "beta": cmdata_beta_averaged,
+                    "gamma": cmdata_gamma_averaged,
+                    "delta": cmdata_delta_averaged,
+                    "theta": cmdata_theta_averaged
+                }
+            })
 
     # 计算整个数据集的全局平均值
     global_alpha_average = np.mean(all_alpha_values, axis=0)
     global_beta_average = np.mean(all_beta_values, axis=0)
     global_gamma_average = np.mean(all_gamma_values, axis=0)
-    global_delta_averaged = np.mean(all_delta_values, axis=0)
-    global_theta_averaged = np.mean(all_theta_values, axis=0)
-    global_joint_average = np.mean(np.stack([global_alpha_average, global_beta_average, global_gamma_average, global_delta_averaged, global_theta_averaged], axis=0),
-                                   axis=0)
+    global_joint_average = np.mean(np.stack([global_alpha_average, global_beta_average, 
+                                             global_gamma_average], axis=0), axis=0)
+    
+    global_delta_average = np.mean(all_delta_values, axis=0)
+    global_theta_average = np.mean(all_theta_values, axis=0)
+    global_joint_average = np.mean(np.stack([global_alpha_average, global_beta_average, 
+                                             global_gamma_average, global_delta_average, 
+                                             global_theta_average], axis=0), axis=0)
 
+    fc_matrices = {'alpha': global_alpha_average, 
+                   'beta': global_beta_average, 
+                   'gamma': global_gamma_average,
+                   'delta': global_delta_average,
+                   'theta': global_theta_average,
+                   'joint': global_joint_average
+                   }
+    
     if draw:
         # 输出结果
         utils_visualization.draw_projection(global_joint_average)
 
     if save:
-        # 检查和创建 Distribution 文件夹
-        output_dir = 'Distribution'
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        # 保存为 HDF5 文件
-        file_path = os.path.join(output_dir, 'fc_global_averages.h5')
-        with h5py.File(file_path, 'w') as f:
-            f.create_dataset('alpha', data=global_alpha_average)
-            f.create_dataset('beta', data=global_beta_average)
-            f.create_dataset('gamma', data=global_gamma_average)
-            f.create_dataset('delta', data=global_delta_averaged)
-            f.create_dataset('theta', data=global_theta_averaged)
-            f.create_dataset('joint', data=global_joint_average)
+        save_results('seed', feature, 'Global_Average', fc_matrices)
 
-        print(f"Results saved to {file_path}")
+        print("Results saved")
 
-    return global_alpha_average, global_beta_average, global_gamma_average, global_delta_averaged, global_theta_averaged, global_joint_average
+    return global_joint_average
 
 # %% Label Engineering
 def generate_labels(sampling_rate=128):
@@ -1146,19 +1237,21 @@ if __name__ == "__main__":
     # %% Label Engineering
     labels_seed = utils_feature_loading.read_labels('seed')
     labels_dreamer = utils_feature_loading.read_labels('dreamer')
-    
     labels_dreamer_ = generate_labels()
     
     # %% Interpolation
     
     # %% Feature Engineering; Computation circles
-    # fc_pcc_matrices_seed = fc_matrices_circle('SEED', feature='pcc', save=False, subject_range=range(1, 2), experiment_range=range(1, 2))
+    # fc_pcc_matrices_seed = fc_matrices_circle('SEED', feature='pcc', save=False, subject_range=range(1, 16), experiment_range=range(1, 4))
     # fc_plv_matrices_seed = fc_matrices_circle('SEED', feature='plv', save=False, subject_range=range(1, 2), experiment_range=range(1, 2))
     # fc_mi_matrices_seed = fc_matrices_circle('SEED', feature='mi', save=False, subject_range=range(1, 2), experiment_range=range(1, 2))
 
-    fc_pcc_matrices_dreamer = fc_matrices_circle('dreamer', feature='pcc', save=True, subject_range=range(1, 2))
-    fc_plv_matrices_dreamer = fc_matrices_circle('dreamer', feature='plv', save=True, subject_range=range(1, 2))
+    # fc_pcc_matrices_dreamer = fc_matrices_circle('dreamer', feature='pcc', save=True, subject_range=range(1, 2))
+    # fc_plv_matrices_dreamer = fc_matrices_circle('dreamer', feature='plv', save=True, subject_range=range(1, 2))
     # fc_mi_matrices_dreamer = fc_matrices_circle('dreamer', feature='mi', save=True, subject_range=range(1, 2))
-
+    
+    # %% Feature Engineering; Compute Average CM
+    global_joint_average = compute_averaged_fcnetwork(feature='pcc', save=True)
+    
     # %% End program actions
     # utils.end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
