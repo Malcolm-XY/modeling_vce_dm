@@ -150,7 +150,101 @@ def filter_eeg_and_save_circle(dataset, subject_range, experiment_range=None, ve
         raise ValueError("Error of unexpected subject or experiment range designation.")
 
 # %% Feature Engineering
-def compute_distance_matrix(dataset, normalize=False,
+def compute_distance_matrix(dataset, projection_params=None, visualize=True):
+    """
+    使用指定投影方法将EEG电极坐标从3D投影到2D平面，或直接在3D空间中计算距离矩阵。
+
+    Args:
+        dataset (str): 数据集名称，用于读取电极坐标。
+        projection_params (dict): 投影参数，包含以下字段：
+            - 'type': 'stereo'、'azimuthal' 或 '3d'
+            - 'focal_length': stereo 参数
+            - 'max_scaling': stereo 参数
+            - 'y_compression_factor': float, y轴压缩/拉伸因子（默认1.0，仅限azimuthal）
+            - 'y_compression_direction': 'positive' 或 'negative'，仅作用一侧
+        visualize (bool): 是否显示投影图（仅2D模式有效）。
+
+    Returns:
+        tuple: (channel_names, distance_matrix)
+    """
+    projection_type = projection_params.get('type')
+
+    # 读取电极数据
+    distribution = utils_feature_loading.read_distribution(dataset)
+    channel_names = distribution['channel']
+    x, y, z = np.array(distribution['x']), np.array(distribution['y']), np.array(distribution['z'])
+
+    if projection_type == '3d':
+        coords = np.vstack((x, y, z)).T
+        diff = coords[:, np.newaxis, :] - coords[np.newaxis, :, :]
+        distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
+        return channel_names, distance_matrix
+
+    if projection_type == 'stereo':
+        focal_length = projection_params.get('focal_length', 1.0)
+        max_scaling = projection_params.get('max_scaling', 5.0)
+        epsilon = 1e-6
+
+        z_norm = (z - np.min(z)) / (np.max(z) - np.min(z))
+        scaling = focal_length / (focal_length - z_norm + epsilon)
+        scaling = np.clip(scaling, 0, max_scaling)
+
+        x_proj = x * scaling
+        y_proj = y * scaling
+
+    elif projection_type == 'azimuthal':
+        coords = np.vstack((x, y, z)).T.astype(np.float64)
+        coords /= np.linalg.norm(coords, axis=1, keepdims=True)
+        x_unit, y_unit, z_unit = coords[:, 0], coords[:, 1], coords[:, 2]
+
+        theta = np.arccos(z_unit)
+        phi = np.arctan2(y_unit, x_unit)
+
+        x_proj = theta * np.cos(phi)
+        y_proj = theta * np.sin(phi)
+    else:
+        raise ValueError(f"未知的投影类型: {projection_type}")
+
+    # === 归一化投影坐标 ===
+    x_norm = (x_proj - np.min(x_proj)) / (np.max(x_proj) - np.min(x_proj))
+    y_norm = (y_proj - np.min(y_proj)) / (np.max(y_proj) - np.min(y_proj))
+
+    # === Azimuthal 特有：仅单侧压缩 y 轴 ===
+    if projection_type == 'azimuthal':
+        y_compression_factor = projection_params.get('y_compression_factor', 1.0)
+        y_compression_direction = projection_params.get('y_compression_direction', 'positive')
+
+        if y_compression_factor != 1.0:
+            y_offset = y_norm - 0.5
+            if y_compression_direction == 'positive':
+                y_offset[y_offset > 0] *= y_compression_factor
+            elif y_compression_direction == 'negative':
+                y_offset[y_offset < 0] *= y_compression_factor
+            y_norm = 0.5 + y_offset
+
+    # 合并投影坐标
+    proj_coords = np.vstack((x_norm, y_norm)).T
+
+    if visualize:
+        plt.figure(figsize=(6, 6))
+        plt.scatter(x_norm, y_norm, c='blue')
+        for i, name in enumerate(channel_names):
+            plt.text(x_norm[i], y_norm[i], name, fontsize=8, ha='right', va='bottom')
+        plt.title(f"Projection: {projection_type}")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.axis("equal")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    # === 计算距离矩阵 ===
+    diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
+    distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
+
+    return channel_names, distance_matrix
+
+def compute_distance_matrix_(dataset, normalize=False,
                             normalization_method='minmax', projection_params=None,
                             visualize=True):
     """
@@ -237,95 +331,6 @@ def compute_distance_matrix(dataset, normalize=False,
         plt.show()
 
     # === 计算距离矩阵 ===
-    diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
-    distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
-
-    if normalize:
-        distance_matrix = normalize_matrix(distance_matrix, method=normalization_method)
-
-    return channel_names, distance_matrix
-
-def compute_distance_matrix_(dataset, normalize=False,
-                            normalization_method='minmax', projection_params=None,
-                            visualize=True):
-    """
-    使用指定投影方法将EEG电极坐标从3D投影到2D平面，并计算距离矩阵。
-
-    Args:
-        dataset (str): 数据集名称，用于读取电极坐标。
-        method (str): 投影方法，唯一可选值为 'projection'。
-        normalize (bool): 是否对输出距离矩阵归一化。
-        normalization_method (str): 使用的归一化方法。
-        projection_params (dict): 投影参数，包含以下字段：
-            - 'type': 'stereo' 或 'azimuthal'
-            - 'focal_length': 焦距，仅对 'stereo' 有效
-            - 'max_scaling': 最大缩放因子，仅对 'stereo' 有效
-        visualize (bool): 是否显示投影图。
-
-    Returns:
-        tuple: (channel_names, distance_matrix)
-    """
-    projection_type = projection_params.get('type', 'stereo') if projection_params else 'stereo'
-
-    # 读取电极数据
-    distribution = utils_feature_loading.read_distribution(dataset)
-    channel_names = distribution['channel']
-    x, y, z = np.array(distribution['x']), np.array(distribution['y']), np.array(distribution['z'])
-
-    if projection_type == 'stereo':
-        focal_length = projection_params.get('focal_length', 1.0)
-        max_scaling = projection_params.get('max_scaling', 5.0)
-        epsilon = 1e-6
-
-        z_norm = (z - np.min(z)) / (np.max(z) - np.min(z))
-        scaling = focal_length / (focal_length - z_norm + epsilon)
-        scaling = np.clip(scaling, 0, max_scaling)
-
-        x_proj = x * scaling
-        y_proj = y * scaling
-
-    elif projection_type == 'azimuthal':
-        coords = np.vstack((x, y, z)).T.astype(np.float64)
-        coords /= np.linalg.norm(coords, axis=1, keepdims=True)
-        x_unit, y_unit, z_unit = coords[:, 0], coords[:, 1], coords[:, 2]
-
-        theta = np.arccos(z_unit)
-        phi = np.arctan2(y_unit, x_unit)
-
-        x_proj = theta * np.cos(phi)
-        y_proj = theta * np.sin(phi)
-
-        # === 自定义 y 方向压缩 ===
-        y_compression_factor = projection_params.get('y_compression_factor', 1.0)
-        y_compression_direction = projection_params.get('y_compression_direction', 'positive')
-
-        if y_compression_direction == 'negative':
-            y_proj = -y_proj * y_compression_factor
-        else:
-            y_proj = y_proj * y_compression_factor
-
-    else:
-        raise ValueError(f"未知的投影类型: {projection_type}")
-
-    # 归一化投影坐标
-    x_norm = (x_proj - np.min(x_proj)) / (np.max(x_proj) - np.min(x_proj))
-    y_norm = (y_proj - np.min(y_proj)) / (np.max(y_proj) - np.min(y_proj))
-    proj_coords = np.vstack((x_norm, y_norm)).T
-
-    if visualize:
-        plt.figure(figsize=(6, 6))
-        plt.scatter(x_norm, y_norm, c='blue')
-        for i, name in enumerate(channel_names):
-            plt.text(x_norm[i], y_norm[i], name, fontsize=8, ha='right', va='bottom')
-        plt.title(f"Projection: {projection_type}")
-        plt.xlabel("x")
-        plt.ylabel("y")
-        plt.axis("equal")
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
-
-    # 计算距离矩阵
     diff = proj_coords[:, np.newaxis, :] - proj_coords[np.newaxis, :, :]
     distance_matrix = np.sqrt(np.sum(diff ** 2, axis=-1))
 

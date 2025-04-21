@@ -173,6 +173,32 @@ def draw_weight_map_from_data(index, weights, ranked_electrodes=None, offset=0, 
 
     return None
 
+def draw_2d_mapping(am, coordinates, text):
+    x = np.array(coordinates['x'])
+    y = np.array(coordinates['y'])
+    
+    # 点大小根据am缩放，避免太小或太大
+    size = 100 * (am - am.min()) / (am.max() - am.min() + 1e-8) + 30
+    
+    # 绘制散点图
+    plt.figure(figsize=(8, 6))
+    scatter = plt.scatter(x, y, c=am, cmap='coolwarm', s=100, edgecolors='k')
+    
+    # 添加颜色条
+    cbar = plt.colorbar(scatter)
+    cbar.set_label('Amplitude/Strength')
+    
+    # 添加文字标签
+    for i, txt in enumerate(text):
+        plt.text(x[i], y[i], txt, fontsize=9, ha='right', va='bottom')
+    
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.title('2D Mapping of Points with am and text')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == '__main__':
     # label-driven-MI
     weights, index = draw_weight_map_from_file(ranking_method='label_driven_mi')

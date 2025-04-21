@@ -13,8 +13,6 @@ from scipy.stats import boxcox, yeojohnson
 from scipy.ndimage import gaussian_filter
 from scipy.optimize import differential_evolution
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.neighbors import NearestNeighbors
-from sklearn.metrics.pairwise import cosine_similarity
 
 import feature_engineering
 import vce_modeling
@@ -90,99 +88,11 @@ def spatial_smoothing_on_fc_matrix(A, coordinates, sigma):
 
     return A_smooth
 
-def clean_and_smooth_cm(CM, coordinates, param, return_mask=False):
-    """
-    Remove abnormal connections and fill them using spatial Gaussian smoothing (only on removed ones).
-
-    Parameters
-    ----------
-    CM : np.ndarray (N, N)
-        Symmetric connectivity matrix.
-    coordinates : dict
-        Dict with 'x', 'y', 'z' coordinate arrays of length N.
-    param : dict
-        - 'asym_thresh': float
-        - 'sim_thresh': float
-        - 'sigma': float
-    return_mask : bool
-        Whether to return the abnormal mask.
-
-    Returns
-    -------
-    CM_cleaned : np.ndarray
-        Cleaned and partially smoothed matrix.
-    (optional) abnormal_mask : np.ndarray
-        Boolean mask of removed connections.
-    """
-    N = CM.shape[0]
-    A = CM.copy()
-
-    # Step 1: Asymmetry detection
-    asym_map = np.abs(A - A.T)
-    asym_mask = (asym_map > param['asym_thresh'])
-
-    # Step 2: Spatial similarity
-    conn_features = A
-    row_sim = cosine_similarity(conn_features)
-    coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T
-    dists = cdist(coords, coords)
-    dist_thresh = np.percentile(dists, 10)
-    sim_mask = np.zeros_like(A, dtype=bool)
-
-    for i in range(N):
-        for j in range(N):
-            if i != j and dists[i, j] < dist_thresh and row_sim[i, j] < param['sim_thresh']:
-                sim_mask[i, j] = True
-
-    # Step 3: Combine masks
-    abnormal_mask = np.logical_or(asym_mask, sim_mask)
-
-    # Step 4: Remove abnormal values
-    A[abnormal_mask] = 0
-    A = 0.5 * (A + A.T)
-
-    # Step 5: Fill only removed entries using spatial Gaussian smoothing
-    weights = np.exp(- (dists ** 2) / (2 * param['sigma'] ** 2))
-    weights /= weights.sum(axis=1, keepdims=True)
-    A_smooth = weights @ A @ weights.T
-
-    A_filled = A.copy()
-    A_filled[abnormal_mask] = A_smooth[abnormal_mask]
-    A_filled = 0.5 * (A_filled + A_filled.T)
-
-    if return_mask:
-        return A_filled, abnormal_mask
-    else:
-        return A_filled
-
-def remove_and_fill_channels_knn(CM, coordinates, param):
-    """
-    Detect abnormal EEG channels from connectivity matrix and fill using KNN-based imputation.
-
-    Parameters:
-    -----------
-    CM : ndarray
-        Functional connectivity matrix (n_channels x n_channels)
-    coordinates : dict
-        Dictionary with keys 'x', 'y', 'z', each of shape (n_channels,)
-    param : dict
-        Parameters including:
-            - 'threshold': float, e.g. 2.5 (Z-score or IQR threshold)
-            - 'method': str, either 'zscore' or 'iqr'
-            - 'k': int, number of nearest neighbors to use for imputation
-
-    Returns:
-    --------
-    CM_filled : ndarray
-        Filled connectivity matrix after bad channels removed and reconstructed.
-    """
+def remove_bads_and_rebuild_cm_IDW(CM, coordinates, param):
     n_channels = CM.shape[0]
-    CM_filled = CM.copy()
-
-    # === 1. Get 3D coordinates
     coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T
 
-    # === 2. Detect bad channels based on mean abs connectivity
+    # === 1. 自动检测 bad 通道
     mean_conn = np.mean(np.abs(CM), axis=1)
 
     if param['method'] == 'zscore':
@@ -196,38 +106,44 @@ def remove_and_fill_channels_knn(CM, coordinates, param):
     else:
         raise ValueError("param['method'] must be 'zscore' or 'iqr'")
 
-    print(f"[KNN Fill] Detected bad channels: {bad_idx.tolist()}")
+    # === 2. 手动指定 bad 通道
+    manual_bad_idx = param.get('manual_bad_idx', [])
+    manual_bad_idx = np.array(manual_bad_idx, dtype=int)
+
+    # === 3. 合并 & 去重
+    bad_idx = np.unique(np.concatenate([bad_idx, manual_bad_idx]))
+    print(f"Detected bad channels: {bad_idx.tolist()}")
 
     if len(bad_idx) == 0:
-        return CM_filled  # No bad channels, return original
+        return CM.copy()
 
-    # === 3. Fit Nearest Neighbors
-    k = param.get('k', 5)
-    nbrs = NearestNeighbors(n_neighbors=k+1).fit(coords)  # +1 to exclude self
+    CM_rebuild = CM.copy()
 
-    for i in bad_idx:
-        dists, indices = nbrs.kneighbors([coords[i]])
-        neighbors = [j for j in indices[0] if j != i][:k]
+    if param['kernel'] == 'gaussian':
+        sigma = param.get('sigma', 1.0)
+        CM_smooth = spatial_smoothing_on_fc_matrix(CM, coordinates, sigma)
+        for i in bad_idx:
+            CM_rebuild[i, :] = CM_smooth[i, :]
+            CM_rebuild[:, i] = CM_smooth[:, i]
+    elif param['kernel'] == 'idw':
+        for i in bad_idx:
+            dists = np.linalg.norm(coords[i] - coords, axis=1)
+            dists[i] = np.inf
+            weights = 1 / dists
+            weights[i] = 0
+            weights /= weights.sum()
+            CM_rebuild[i, :] = weights @ CM
+            CM_rebuild[:, i] = CM_rebuild[i, :]
+    else:
+        raise ValueError("Unsupported kernel type")
 
-        # Replace row and column using mean of neighbors
-        CM_filled[i, :] = np.mean(CM[neighbors, :], axis=0)
-        CM_filled[:, i] = np.mean(CM[:, neighbors], axis=1)
-        CM_filled[i, i] = 0  # Clean diagonal
-
-    return CM_filled
+    return CM_rebuild
 
 def preprocessing_global_averaged_cm(feature='PCC'):
     # Global averaged connectivity matrix; For subsquent fitting computation
     global_joint_average = vce_modeling.load_global_averages(feature=feature)
     global_joint_average = np.abs(global_joint_average)
     connectivity_matrix = feature_engineering.normalize_matrix(global_joint_average)
-    
-    # Replace bad channel; F7
-    # connectivity_matrix[5, :] = connectivity_matrix[6, :].copy()
-    # connectivity_matrix[:, 5] = connectivity_matrix[:, 6].copy()
-    
-    # connectivity_matrix[27, :] = np.mean(connectivity_matrix, axis=0).copy()
-    # connectivity_matrix[:, 27] = np.mean(connectivity_matrix, axis=1).copy()
     
     # Apply Spatial Gaussian Smoothing to CM
     # connectivity_matrix = gaussian_filter(connectivity_matrix, sigma=0.5)
@@ -237,8 +153,14 @@ def preprocessing_global_averaged_cm(feature='PCC'):
     utils_visualization.draw_projection(connectivity_matrix)
     
     coordinates = utils_feature_loading.read_distribution('seed')
-    param = {'threshold': 1.5, 'method': 'zscore', 'k': 5}
-    connectivity_matrix = remove_and_fill_channels_knn(connectivity_matrix, coordinates, param)
+    param = {
+    'method': 'zscore',
+    'threshold': 2.5,
+    'kernel': 'idw',  # idw or 'gaussian'
+    'sigma': 0.5,  # only used for gaussian
+    'manual_bad_idx': []
+    }
+    connectivity_matrix = remove_bads_and_rebuild_cm_IDW(connectivity_matrix, coordinates, param)
     
     utils_visualization.draw_projection(connectivity_matrix)
     
@@ -270,7 +192,60 @@ def boxcox_transform_matrix(matrix, epsilon=1e-6):
 
     return transformed_matrix, lambdas
 
-def prepare_target_and_inputs(feature='PCC', ranking_method='label_driven_mi_origin'):
+def prepare_target_and_inputs(feature='PCC', ranking_method='label_driven_mi_origin', manual_bad_idx=None):
+    """
+    Prepares smoothed channel weights, distance matrix, and global averaged connectivity matrix,
+    with optional removal of specified bad channels.
+
+    Parameters
+    ----------
+    feature : str
+        Connectivity feature type (e.g., 'PCC').
+    ranking_method : str
+        Method for computing channel importance weights.
+    manual_bad_idx : list of int or None
+        Indices of channels to manually remove from all matrices/vectors.
+
+    Returns
+    -------
+    cw_target_smooth : np.ndarray of shape (n,)
+    distance_matrix : np.ndarray of shape (n, n)
+    connectivity_matrix : np.ndarray of shape (n, n)
+    """
+    import numpy as np
+    from utils import utils_feature_loading
+
+    # === 1. Target channel weight
+    weights = drawer_channel_weight.get_ranking_weight(ranking_method)
+    cw_target = prune_cw(weights.to_numpy())
+
+    # === 2. Coordinates for smoothing
+    coordinates = utils_feature_loading.read_distribution('seed')
+    cw_target_smooth = spatial_gaussian_smoothing(cw_target, coordinates, sigma=20.0)
+
+    # === 3. Distance matrix
+    _, distance_matrix = feature_engineering.compute_distance_matrix(
+        dataset="SEED", projection_params={"type": "3d"})
+    distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
+
+    # === 4. Connectivity matrix
+    connectivity_matrix = preprocessing_global_averaged_cm(feature=feature)
+
+    # === 5. Remove specified bad channels
+    if manual_bad_idx is not None and len(manual_bad_idx) > 0:
+        manual_bad_idx = sorted(set(manual_bad_idx))
+        print(f"Manually removing bad channels: {manual_bad_idx}")
+
+        mask = np.ones(cw_target_smooth.shape[0], dtype=bool)
+        mask[manual_bad_idx] = False
+
+        cw_target_smooth = cw_target_smooth[mask]
+        distance_matrix = distance_matrix[mask][:, mask]
+        connectivity_matrix = connectivity_matrix[mask][:, mask]
+
+    return cw_target_smooth, distance_matrix, connectivity_matrix
+
+def prepare_target_and_inputs_(feature='PCC', ranking_method='label_driven_mi_origin'):
     # Target; Label-Driven CW
     weights = drawer_channel_weight.get_ranking_weight('label_driven_mi_origin')
     cw_target = prune_cw(weights.to_numpy())
@@ -281,8 +256,11 @@ def prepare_target_and_inputs(feature='PCC', ranking_method='label_driven_mi_ori
     cw_target_smooth = spatial_gaussian_smoothing(cw_target, coordinates, sigma=20.0)
     
     # Distance matrix; For subsquent fitting computation
-    _, distance_matrix = feature_engineering.compute_distance_matrix('seed',
-        projection_params={'type': 'azimuthal', 'y_compression_factor': 0.5,'y_compression_direction': 'negative'})
+    # _, distance_matrix = feature_engineering.compute_distance_matrix('seed',
+    #     projection_params={'type': 'azimuthal', 'y_compression_factor': 1,'y_compression_direction': 'negative'})
+    
+    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="SEED", projection_params={"type": "3d"})
+    
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
 
     # Global averaged connectivity matrix; For subsquent fitting computation
@@ -326,7 +304,8 @@ if __name__ == '__main__':
     results, fittings = {}, {}
     
     # Fittin target and DM
-    cw_target, distance_matrix, connectivity_matrix = prepare_target_and_inputs('PCC', 'label_driven_mi_origin')
+    manual_bad_channels = [57, 61]
+    cw_target, distance_matrix, connectivity_matrix = prepare_target_and_inputs('PCC', 'label_driven_mi_origin', manual_bad_channels)
 
     # %% Validation of Fitting Comparison; Before Fitting
     # Electrode labels
@@ -334,8 +313,11 @@ if __name__ == '__main__':
     electrodes = utils_feature_loading.read_distribution('seed')['channel']
     if hasattr(electrodes, 'tolist'):
         electrodes = electrodes.tolist()
-    
-    x = electrodes  # Electrode names 作为横轴
+
+    for i in sorted(manual_bad_channels, reverse=True):
+        del electrodes[i]
+    x = electrodes
+    # Electrode names 作为横轴
     
     # Load and normalize non-modeled r
     cm_global_averaged = connectivity_matrix.copy()
@@ -362,6 +344,14 @@ if __name__ == '__main__':
     plt.show()
     
     # %% Fitting
+    optimize_and_store(
+        'exponential',
+        loss_fn_template('gaussian', lambda p: {'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]}, cw_target, distance_matrix, connectivity_matrix),
+        [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+        ['sigma', 'scale_a', 'scale_b'],
+        distance_matrix, connectivity_matrix
+    )
+    
     optimize_and_store(
         'gaussian',
         loss_fn_template('gaussian', lambda p: {'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]}, cw_target, distance_matrix, connectivity_matrix),
@@ -420,7 +410,9 @@ if __name__ == '__main__':
     if hasattr(electrodes, 'tolist'):
         electrodes = electrodes.tolist()
     
-    x = electrodes  # Electrode names 作为横轴
+    for i in sorted(manual_bad_channels, reverse=True):
+        del electrodes[i]
+    x = electrodes.copy() # Electrode names 作为横轴
     
     for method, cw_fitting in fittings.items():
         plt.figure(figsize=(10, 4))  # 每张图单独设置大小
@@ -450,60 +442,66 @@ if __name__ == '__main__':
     
     # %% Validation of Brain Topography
     from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']    
+    electrodes = utils_feature_loading.read_distribution('seed')['channel']
+    for i in sorted(manual_bad_channels, reverse=True):
+        del electrodes[i]
     
     # target
     cw_target_ = cw_target.copy()
     # Apply Spatial Gaussian smoothing to target
     coordinates = utils_feature_loading.read_distribution('seed')
+    coordinates = coordinates.drop(index=manual_bad_channels)
+    
     cw_target_smooth = spatial_gaussian_smoothing(cw_target_, coordinates, sigma=20.0)
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_target_smooth, electrodes)
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    drawer_channel_weight.draw_2d_mapping(cw_target_smooth, coordinates, electrodes)
     
-    # non-fitted
-    cw_non_fitted = vce_modeling.load_global_averages(feature='PCC')
-    cw_non_fitted = np.mean(cw_non_fitted, axis=0)
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_non_fitted, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_target_smooth, electrodes)
+    # drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
     
-    # fitted
-    cw_fitted_g_gaussian = fittings['generalized_gaussian']
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_fitted_g_gaussian, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # # non-fitted
+    # cw_non_fitted = vce_modeling.load_global_averages(feature='PCC')
+    # cw_non_fitted = np.mean(cw_non_fitted, axis=0)
+    # _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_non_fitted, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
+    # drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
     
-    cw_fitted_inverse = fittings['inverse']
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_fitted_inverse, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # # fitted
+    # cw_fitted_g_gaussian = fittings['generalized_gaussian']
+    # _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_fitted_g_gaussian, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
+    # drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
     
-    cw_fitted_sigmoid = fittings['sigmoid']
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_fitted_sigmoid, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # cw_fitted_inverse = fittings['inverse']
+    # _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_fitted_inverse, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
+    # drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    
+    # cw_fitted_sigmoid = fittings['sigmoid']
+    # _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(cw_fitted_sigmoid, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
+    # drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
 
-    # %% Resort Fittings; For Saving
-    weights_sigmoid = fittings['sigmoid'].copy()
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    rank_sigmoid = {'weights': weights_sigmoid, 'electrodes': electrodes}
-    # 获取排序后的索引（按权重降序）
-    sorted_indices = np.argsort(-weights_sigmoid)  # 负号表示降序排序
+    # # %% Resort Fittings; For Saving
+    # # weights_sigmoid = fittings['sigmoid'].copy()
+    # # from utils import utils_feature_loading
+    # # electrodes = utils_feature_loading.read_distribution('seed')['channel']
+    # # rank_sigmoid = {'weights': weights_sigmoid, 'electrodes': electrodes}
+    # # # 获取排序后的索引（按权重降序）
+    # # sorted_indices = np.argsort(-weights_sigmoid)  # 负号表示降序排序
     
-    # 构造排序后的结果
-    ranked_sigmoid = {
-        'weights': weights_sigmoid[sorted_indices],               # 排序后的权重
-        'electrodes': electrodes[sorted_indices],    # 排序后的电极
-        'original_indices': sorted_indices               # 排序后电极在原始 electrodes 中的索引
-    }
+    # # # 构造排序后的结果
+    # # ranked_sigmoid = {
+    # #     'weights': weights_sigmoid[sorted_indices],               # 排序后的权重
+    # #     'electrodes': electrodes[sorted_indices],    # 排序后的电极
+    # #     'original_indices': sorted_indices               # 排序后电极在原始 electrodes 中的索引
+    # # }
     
-    weights_g_gaussian = fittings['generalized_gaussian'].copy()
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    rank_g_gaussian = {'weights': weights_sigmoid, 'electrodes': electrodes}
-    # 获取排序后的索引（按权重降序）
-    sorted_indices = np.argsort(-weights_g_gaussian)  # 负号表示降序排序
+    # # weights_g_gaussian = fittings['generalized_gaussian'].copy()
+    # # from utils import utils_feature_loading
+    # # electrodes = utils_feature_loading.read_distribution('seed')['channel']
+    # # rank_g_gaussian = {'weights': weights_sigmoid, 'electrodes': electrodes}
+    # # # 获取排序后的索引（按权重降序）
+    # # sorted_indices = np.argsort(-weights_g_gaussian)  # 负号表示降序排序
     
-    # 构造排序后的结果
-    ranked_g_gaussian = {
-        'weights': weights_g_gaussian[sorted_indices],               # 排序后的权重
-        'electrodes': electrodes[sorted_indices],    # 排序后的电极
-        'original_indices': sorted_indices               # 排序后电极在原始 electrodes 中的索引
-    }
+    # # # 构造排序后的结果
+    # # ranked_g_gaussian = {
+    # #     'weights': weights_g_gaussian[sorted_indices],               # 排序后的权重
+    # #     'electrodes': electrodes[sorted_indices],    # 排序后的电极
+    # #     'original_indices': sorted_indices               # 排序后电极在原始 electrodes 中的索引
+    # # }
