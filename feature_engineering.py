@@ -1160,57 +1160,227 @@ def global_padding(matrix, width=81, verbose=True):
     return padded_matrix
 
 # %% Normalize
-def normalize_matrix(matrix, method='minmax'):
+from scipy.stats import boxcox, yeojohnson
+def normalize_matrix(matrix, method='minmax', epsilon=1e-8, param=None):
     """
-    对矩阵进行归一化处理。
+    对矩阵进行归一化或变换处理。
 
-    Args:
-        matrix (numpy.ndarray): 要归一化的矩阵或数组
-        method (str, optional): 归一化方法，可选值为'minmax'、'max'、'mean'、'z-score'。默认为'minmax'。
-            - 'minmax': (x - min) / (max - min)，将值归一化到[0,1]区间
-            - 'max': x / max，将最大值归一化为1
-            - 'mean': x / mean，相对于平均值进行归一化
-            - 'z-score': (x - mean) / std，标准化为均值0，标准差1
+    支持方法包括：minmax, max, mean, z-score, boxcox, yeojohnson, sqrt, log, none
 
-    Returns:
-        numpy.ndarray: 归一化后的矩阵
-
-    Raises:
-        ValueError: 当提供的归一化方法不受支持时
+    param:
+        - minmax: {'target_range': (a, b)}
+        - boxcox/yeojohnson: {'lmbda': float}
     """
-    # 创建输入矩阵的副本，避免修改原始数据
+    if param is None:
+        param = {}
+
     normalized = matrix.copy()
 
     if method == 'minmax':
-        # Min-Max归一化：将值归一化到[0,1]区间
         min_val = np.min(normalized)
         max_val = np.max(normalized)
-        if max_val > min_val:  # 避免除以零
-            normalized = (normalized - min_val) / (max_val - min_val)
+        scale = max_val - min_val
+        if scale < epsilon:
+            scale = epsilon
+        normed = (normalized - min_val) / scale
+        a, b = param.get('target_range', (0, 1))
+        normalized = normed * (b - a) + a
 
     elif method == 'max':
-        # 最大值归一化：将值归一化到[0,1]区间，最大值为1
         max_val = np.max(normalized)
-        if max_val > 0:  # 避免除以零
-            normalized = normalized / max_val
+        if abs(max_val) < epsilon:
+            max_val = epsilon
+        normalized = normalized / max_val
 
     elif method == 'mean':
-        # 均值归一化：相对于平均值进行归一化
         mean_val = np.mean(normalized)
-        if mean_val > 0:  # 避免除以零
-            normalized = normalized / mean_val
+        if abs(mean_val) < epsilon:
+            mean_val = epsilon
+        normalized = normalized / mean_val
 
     elif method == 'z-score':
-        # Z-score标准化：将均值归一化为0，标准差归一化为1
         mean_val = np.mean(normalized)
         std_val = np.std(normalized)
-        if std_val > 0:  # 避免除以零
-            normalized = (normalized - mean_val) / std_val
+        if std_val < epsilon:
+            std_val = epsilon
+        normalized = (normalized - mean_val) / std_val
+
+    elif method == 'boxcox':
+        normalized = normalized + epsilon
+        if np.any(normalized <= 0):
+            raise ValueError("Box-Cox 变换要求所有数据 > 0")
+        lmbda = param.get('lmbda', None)
+        flat, _ = boxcox(normalized.flatten(), lmbda=lmbda)
+        normalized = flat.reshape(normalized.shape)
+    
+    elif method == 'yeojohnson':
+        lmbda = param.get('lmbda', None)
+        flat, _ = yeojohnson(normalized.flatten(), lmbda=lmbda)
+        normalized = flat.reshape(normalized.shape)
+
+    elif method == 'sqrt':
+        if np.any(normalized < 0):
+            raise ValueError("平方根变换要求所有数据 ≥ 0")
+        normalized = np.sqrt(normalized + epsilon)
+
+    elif method == 'log':
+        if np.any(normalized <= 0):
+            raise ValueError("对数变换要求所有数据 > 0")
+        normalized = np.log(normalized + epsilon)
+
+    elif method == 'none':
+        pass  # 原样返回副本
 
     else:
-        raise ValueError(f"不支持的归一化方法: {method}，可选值为'minmax'、'max'、'mean'或'z-score'")
+        raise ValueError(f"不支持的归一化方法: {method}")
 
     return normalized
+
+def rebuild_features(data, coordinates, param, visualize=False):
+    """
+    用 IDW 或 Gaussian 对坏通道进行重建，支持连接矩阵 (n,n) 或特征向量 (n,)
+
+    Args:
+        data (np.ndarray): 输入数据，shape 为 (n, n) 或 (n,)
+        coordinates (dict): {'x': [...], 'y': [...], 'z': [...]}
+        param (dict): 同上，支持 method / threshold / kernel / sigma / manual_bad_idx
+
+    Returns:
+        np.ndarray: 重建后的数据
+    """
+    if visualize:
+        try:
+            utils_visualization.draw_projection(data)
+        except ModuleNotFoundError: 
+            print("utils_visualization not found")
+    
+    data = data.copy()
+    coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T
+    n = coords.shape[0]
+
+    # === 自动检测坏通道（按平均值做异常点检测）
+    if data.ndim == 2:
+        mean_val = np.mean(np.abs(data), axis=1)
+    elif data.ndim == 1:
+        mean_val = np.abs(data)
+    else:
+        raise ValueError("Only supports 1D or 2D array")
+
+    if param['method'] == 'zscore':
+        z = (mean_val - np.mean(mean_val)) / (np.std(mean_val) + 1e-8)
+        bad_idx = np.where(np.abs(z) > param['threshold'])[0]
+    elif param['method'] == 'iqr':
+        q1, q3 = np.percentile(mean_val, [25, 75])
+        iqr = q3 - q1
+        lower, upper = q1 - param['threshold'] * iqr, q3 + param['threshold'] * iqr
+        bad_idx = np.where((mean_val < lower) | (mean_val > upper))[0]
+    else:
+        raise ValueError("param['method'] must be 'zscore' or 'iqr'")
+
+    # === 合并手动坏通道
+    manual = np.array(param.get('manual_bad_idx', []), dtype=int)
+    bad_idx = np.unique(np.concatenate([bad_idx, manual]))
+
+    print(f"[INFO] Detected bad channels: {bad_idx.tolist()}")
+    if len(bad_idx) == 0:
+        return data
+
+    # === 开始重建
+    for i in bad_idx:
+        dists = np.linalg.norm(coords[i] - coords, axis=1)
+        dists[i] = np.inf
+
+        if param['kernel'] == 'idw':
+            weights = 1 / (dists + 1e-8)
+        elif param['kernel'] == 'gaussian':
+            sigma = param.get('sigma', 1.0)
+            weights = np.exp(-dists**2 / (2 * sigma**2))
+        else:
+            raise ValueError("Unsupported kernel type")
+
+        weights[i] = 0
+        weights /= weights.sum()
+
+        if data.ndim == 1:
+            data[i] = weights @ data
+        elif data.ndim == 2:
+            data[i, :] = weights @ data
+            data[:, i] = data[i, :]  # 对称处理
+
+    if visualize:
+        try:
+            utils_visualization.draw_projection(data)
+        except ModuleNotFoundError: 
+            print("utils_visualization not found")
+
+    return data
+
+from scipy.spatial.distance import cdist
+def spatial_gaussian_smoothing_on_vector(A, coordinates, sigma):
+    coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T
+    dists = cdist(coords, coords)
+    weights = np.exp(- (dists ** 2) / (2 * sigma ** 2))
+    weights /= weights.sum(axis=1, keepdims=True)
+    A_smooth = weights @ A
+    return A_smooth
+
+def spatial_gaussian_smoothing_on_fc_matrix(A, coordinates, sigma):
+    """
+    Applies spatial Gaussian smoothing to a symmetric functional connectivity (FC) matrix.
+
+    Parameters
+    ----------
+    A : np.ndarray of shape (N, N)
+        Symmetric functional connectivity matrix.
+    coordinates : dict with keys 'x', 'y', 'z'
+        Each value is a list or array of length N, giving 3D coordinates for each channel.
+    sigma : float
+        Standard deviation of the spatial Gaussian kernel.
+
+    Returns
+    -------
+    A_smooth : np.ndarray of shape (N, N)
+        Symmetrically smoothed functional connectivity matrix.
+    """
+
+    # Step 1: Stack coordinate vectors to (N, 3)
+    coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T  # shape (N, 3)
+
+    # Step 2: Compute Euclidean distance matrix between channels
+    dists = cdist(coords, coords)  # shape (N, N)
+
+    # Step 3: Compute spatial Gaussian weights
+    weights = np.exp(- (dists ** 2) / (2 * sigma ** 2))  # shape (N, N)
+    weights /= weights.sum(axis=1, keepdims=True)       # normalize per row
+
+    # Step 4: Apply spatial smoothing to both rows and columns
+    A_smooth = weights @ A @ weights.T
+
+    # Step 5 (optional): Enforce symmetry
+    A_smooth = 0.5 * (A_smooth + A_smooth.T)
+
+    return A_smooth
+# %% Tools
+def remove_idx_manual(A, manual_idxs=[]):
+    if len(A.shape) == 1:
+        A = np.delete(A, manual_idxs, axis=0)
+    elif len(A.shape) == 2:
+        A = np.delete(A, manual_idxs, axis=0)
+        A = np.delete(A, manual_idxs, axis=1)
+    elif len(A.shape) == 3:
+        A = np.delete(A, manual_idxs, axis=1)
+        A = np.delete(A, manual_idxs, axis=2)
+    return A
+
+def insert_idx_manual(A, manual_idxs=[], value=0):
+    if len(A.shape) == 1:
+        for idx in manual_idxs:
+            if idx >= len(A):
+                A = np.append(A, value)
+            else:
+                A = np.insert(A, idx, value)
+                
+    return A
 
 # %% Example usage
 if __name__ == "__main__":
@@ -1256,7 +1426,7 @@ if __name__ == "__main__":
     # fc_mi_matrices_dreamer = fc_matrices_circle('dreamer', feature='mi', save=True, subject_range=range(1, 2))
     
     # %% Feature Engineering; Compute Average CM
-    global_joint_average = compute_averaged_fcnetwork(feature='pcc', save=True)
+    # global_joint_average = compute_averaged_fcnetwork(feature='pcc', save=True)
     
     # %% End program actions
     # utils.end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

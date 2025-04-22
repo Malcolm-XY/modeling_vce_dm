@@ -40,6 +40,25 @@ def draw_heatmap_1d(data, yticklabels=None):
     plt.title("Vertical Heatmap of Nx1 Array")
     plt.show()
 
+def draw_joint_heatmap_1d(data_dict):
+    heatmap_labels = []
+    heatmap_data = []
+
+    for label, data in data_dict.items():
+        heatmap_labels.append(label)
+        heatmap_data.append(data)
+
+    heatmap_data = np.vstack(heatmap_data) 
+    heatmap_labels = np.array(heatmap_labels)
+        
+    plt.figure(figsize=(14, 6))
+    sns.heatmap(heatmap_data, cmap='viridis', cbar=True, xticklabels=False, yticklabels=heatmap_labels, linewidths=0.5, linecolor='gray')
+    plt.title("Heatmap of cw_target and All cw_fitting Vectors")
+    plt.xlabel("Channel Index")
+    plt.ylabel("Model")
+    plt.tight_layout()
+    plt.show()
+
 def draw_projection(sample_projection):
     """
     Visualizes data projections (common for both datasets).

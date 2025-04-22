@@ -133,8 +133,7 @@ def draw_weight_map_from_file(ranking_method='label_driven_mi', offset=0, transf
 
     return None
 
-def draw_weight_map_from_data(index, weights, ranked_electrodes=None, offset=0, transformation=None,
-                              reverse=False):
+def draw_weight_map_from_data(index, weights, ranked_electrodes=None, offset=0, transformation=None, reverse=False):
     if reverse:
         weights = 1 - weights
     distribution = utils_feature_loading.read_distribution('seed')
@@ -173,7 +172,7 @@ def draw_weight_map_from_data(index, weights, ranked_electrodes=None, offset=0, 
 
     return None
 
-def draw_2d_mapping(am, coordinates, text):
+def draw_2d_mapping(am, coordinates, text, title='title'):
     x = np.array(coordinates['x'])
     y = np.array(coordinates['y'])
     
@@ -194,7 +193,10 @@ def draw_2d_mapping(am, coordinates, text):
     
     plt.xlabel('X')
     plt.ylabel('Y')
-    plt.title('2D Mapping of Points with am and text')
+    if title == None:
+        plt.title('Heatmap with Mapping')
+    else: 
+        plt.title(title)
     plt.grid(True)
     plt.tight_layout()
     plt.show()
