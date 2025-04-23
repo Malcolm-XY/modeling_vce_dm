@@ -30,19 +30,22 @@ def preprocessing_cm_global_averaged(feature='pcc'):
     cm_global_averaged = np.abs(connectivity_matrix_global_joint_averaged)
     cm_global_averaged = feature_engineering.normalize_matrix(cm_global_averaged)
     
-    # Gaussian Smooth CM
-    # connectivity_matrix = gaussian_filter(connectivity_matrix, sigma=0.5)
-    
     # Rebuild CM; By removing bads and Gaussian smoothing
     coordinates = utils_feature_loading.read_distribution('seed')
     
     param = {
     'method': 'zscore', 'threshold': 2.5,
     'kernel': 'gaussian',  # idw or 'gaussian'
-    'sigma': 2.0,  # only used for gaussian
+    'sigma': 5.0,  # only used for gaussian
     'manual_bad_idx': []}
     
-    cm_global_averaged = feature_engineering.rebuild_features(cm_global_averaged, coordinates, param, visualize=True)
+    cm_global_averaged = feature_engineering.rebuild_features(cm_global_averaged, coordinates, param, True)
+    
+    # 2D Gaussian Smooth CM
+    # connectivity_matrix = gaussian_filter(connectivity_matrix, sigma=0.5)
+    
+    # Spatial Gaussian Smooth CM
+    cm_global_averaged = feature_engineering.spatial_gaussian_smoothing_on_fc_matrix(cm_global_averaged, coordinates, 5, True)
     
     return cm_global_averaged
 
@@ -72,7 +75,7 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
 
     # Coordinates for smoothing cw_target
     coordinates = utils_feature_loading.read_distribution('seed')    
-    cw_target_smooth = feature_engineering.spatial_gaussian_smoothing_on_vector(cw_target, coordinates, sigma=2.0)
+    cw_target_smooth = feature_engineering.spatial_gaussian_smoothing_on_vector(cw_target, coordinates, 2.0)
 
     # === 2. Distance matrix
     _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
@@ -105,6 +108,7 @@ def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix
     cm_recovered = feature_engineering.normalize_matrix(cm_recovered)
     
     # RCW; Calculate from RCM
+    global cw_fitting
     cw_fitting = np.mean(cm_recovered, axis=0)
     cw_fitting = prune_cw(cw_fitting)
     return cw_fitting
@@ -113,8 +117,11 @@ def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix
 def optimize_and_store(name, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix):
     res = differential_evolution(loss_fn, bounds=bounds, strategy='best1bin', maxiter=1000)
     params = dict(zip(param_keys, res.x))
-    results[name] = {'params': params, 'loss': res.fun}
-    cws_fitting[name] = compute_cw_fitting(name, params, distance_matrix, connectivity_matrix)
+    
+    result = {'params': params, 'loss': res.fun}
+    cw_fitting = compute_cw_fitting(name, params, distance_matrix, connectivity_matrix)
+    
+    return result, cw_fitting
 
 def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix):
     def loss_fn(params):
@@ -122,6 +129,157 @@ def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, con
         return loss
     return loss_fn
 
+def fitting_basic_model():
+    results, cws_fitting = {}, {}
+    
+    fitting_method_config = {
+        'exponential': {
+            'param_names': ['sigma', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]
+            }
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]
+            }
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'alpha': p[1], 'scale_a': p[2], 'scale_b': p[3]
+            }
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'alpha': p[0], 'scale_a': p[1], 'scale_b': p[2]
+            }
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'alpha': p[1], 'scale_a': p[2], 'scale_b': p[3]
+            }
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'beta': p[1], 'scale_a': p[2], 'scale_b': p[3]
+            }
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'mu': p[0], 'beta': p[1], 'scale_a': p[2], 'scale_b': p[3]
+            }
+        }
+    }
+
+    for method, config in fitting_method_config.items():
+        print(method)
+        
+        results[method], cws_fitting[method] = optimize_and_store(
+            method,
+            loss_fn_template(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
+            config['bounds'],
+            config['param_names'],
+            distance_matrix, cm_global_averaged
+        )
+    
+    print("=== Fitting Results of All Models (Minimum MSE) ===")
+    for method, result in results.items():
+        print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
+
+    return results, cws_fitting
+
+def fitting_advanced_model():
+    results, cws_fitting = {}, {}
+    
+    fitting_method_config = {
+        'exponential': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'deviation': p[1], 'offset': p[2],
+                'scale_a': p[3], 'scale_b': p[4]
+            }
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'deviation': p[1], 'offset': p[2],
+                'scale_a': p[3], 'scale_b': p[4]
+            }
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'alpha': p[1], 'deviation': p[2], 'offset': p[3],
+                'scale_a': p[4], 'scale_b': p[5]
+            }
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (1e-6, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'alpha': p[0], 'deviation': p[1], 'offset': p[2],
+                'scale_a': p[3], 'scale_b': p[4]
+            }
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'alpha': p[1], 'deviation': p[2], 'offset': p[3],
+                'scale_a': p[4], 'scale_b': p[5]
+            }
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'sigma': p[0], 'beta': p[1], 'deviation': p[2], 'offset': p[3],
+                'scale_a': p[4], 'scale_b': p[5]
+            }
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'param_func': lambda p: {
+                'mu': p[0], 'beta': p[1], 'deviation': p[2], 'offset': p[3],
+                'scale_a': p[4], 'scale_b': p[5]
+            }
+        }
+    }
+    
+    for method, config in fitting_method_config.items():
+        print(method)
+        
+        results[method], cws_fitting[method] = optimize_and_store(
+            method,
+            loss_fn_template(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
+            config['bounds'],
+            config['param_names'],
+            distance_matrix, cm_global_averaged
+        )
+    
+    print("=== Fitting Results of All Models (Minimum MSE) ===")
+    for method, result in results.items():
+        print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
+    
+    return results, cws_fitting
+    
 # %% Visualization
 def draw_scatter_comparison(x, A, B, pltlabels={'title':'title', 
                                                 'label_x':'label_x', 'label_y':'label_y', 
@@ -173,66 +331,8 @@ if __name__ == '__main__':
                                                     'label_driven_mi_origin', channel_manual_remove)
 
     # %% Fitting
-    results, cws_fitting = {}, {}
-    optimize_and_store(
-        'exponential',
-        loss_fn_template('gaussian', lambda p: {'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
-        ['sigma', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-    
-    optimize_and_store(
-        'gaussian',
-        loss_fn_template('gaussian', lambda p: {'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
-        ['sigma', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-    
-    optimize_and_store(
-        'inverse',
-        loss_fn_template('inverse', lambda p: {'sigma': p[0], 'alpha': p[1], 'scale_a': p[2], 'scale_b': p[3]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-        ['sigma', 'alpha', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-    
-    optimize_and_store(
-        'powerlaw',
-        loss_fn_template('powerlaw', lambda p: {'alpha': p[0], 'scale_a': p[1], 'scale_b': p[2]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 10.0), (0.01, 1.0), (-1.0, 2.0)],
-        ['alpha', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-    
-    optimize_and_store(
-        'rational_quadratic',
-        loss_fn_template('rational_quadratic', lambda p: {'sigma': p[0], 'alpha': p[1], 'scale_a': p[2], 'scale_b': p[3]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
-        ['sigma', 'alpha', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-    
-    optimize_and_store(
-        'generalized_gaussian',
-        loss_fn_template('generalized_gaussian', lambda p: {'sigma': p[0], 'beta': p[1], 'scale_a': p[2], 'scale_b': p[3]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-        ['sigma', 'beta', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-    
-    optimize_and_store(
-        'sigmoid',
-        loss_fn_template('sigmoid', lambda p: {'mu': p[0], 'beta': p[1], 'scale_a': p[2], 'scale_b': p[3]}, cw_target, distance_matrix, cm_global_averaged),
-        [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-        ['mu', 'beta', 'scale_a', 'scale_b'],
-        distance_matrix, cm_global_averaged
-    )
-
-    print("=== Fitting Results of All Models (Minimum MSE) ===")
-    for method, result in results.items():
-        print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
+    # results, cws_fitting = fitting_basic_model()
+    results, cws_fitting = fitting_advanced_model()
 
     # %% Validation of Fitting Comparison
     cw_non_modeled = np.mean(cm_global_averaged, axis=0)
@@ -253,10 +353,6 @@ if __name__ == '__main__':
         _pltlabels['title'] = f'Comparison of CWs; {method}'
         _pltlabels['label_B'] = 'CW_Recovered_CM_PCC(Fitted)'
         draw_scatter_comparison(electrodes, cw_target, cw_fitting, _pltlabels)
-
-    # %% Validation of Heatmap
-    cws_fitting['cw_target'] = cw_target
-    utils_visualization.draw_joint_heatmap_1d(cws_fitting)
     
     # %% Validation of Brain Topography
     # Coordinates
@@ -272,7 +368,11 @@ if __name__ == '__main__':
     # fitted
     for method, cw_fitted in cws_fitting.items():
         drawer_channel_weight.draw_2d_mapping(cw_fitted, coordinates, electrodes, f'{method}_Modeled(Fitted)')
-
+        
+    # %% Validation of Heatmap
+    cws_fitting['cw_target'] = cw_target
+    utils_visualization.draw_joint_heatmap_1d(cws_fitting)
+    
     # %% Sort ranks of channel weights based on fitted models
     # electrodes
     electrodes_original = np.array(utils_feature_loading.read_distribution('seed')['channel'])

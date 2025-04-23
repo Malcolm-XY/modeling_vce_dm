@@ -1250,13 +1250,13 @@ def rebuild_features(data, coordinates, param, visualize=False):
     """
     if visualize:
         try:
-            utils_visualization.draw_projection(data)
+            utils_visualization.draw_projection(data, 'Before Spatial Gaussian Rebuilding')
         except ModuleNotFoundError: 
             print("utils_visualization not found")
     
     data = data.copy()
     coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T
-    n = coords.shape[0]
+    # n = coords.shape[0]
 
     # === 自动检测坏通道（按平均值做异常点检测）
     if data.ndim == 2:
@@ -1309,7 +1309,7 @@ def rebuild_features(data, coordinates, param, visualize=False):
 
     if visualize:
         try:
-            utils_visualization.draw_projection(data)
+            utils_visualization.draw_projection(data, 'After Spatial Gaussian Rebuilding')
         except ModuleNotFoundError: 
             print("utils_visualization not found")
 
@@ -1324,7 +1324,7 @@ def spatial_gaussian_smoothing_on_vector(A, coordinates, sigma):
     A_smooth = weights @ A
     return A_smooth
 
-def spatial_gaussian_smoothing_on_fc_matrix(A, coordinates, sigma):
+def spatial_gaussian_smoothing_on_fc_matrix(A, coordinates, sigma, visualize=False):
     """
     Applies spatial Gaussian smoothing to a symmetric functional connectivity (FC) matrix.
 
@@ -1342,7 +1342,12 @@ def spatial_gaussian_smoothing_on_fc_matrix(A, coordinates, sigma):
     A_smooth : np.ndarray of shape (N, N)
         Symmetrically smoothed functional connectivity matrix.
     """
-
+    if visualize:
+        try:
+            utils_visualization.draw_projection(A, 'Before Spatial Gaussian Smoothing')
+        except ModuleNotFoundError: 
+            print("utils_visualization not found")
+    
     # Step 1: Stack coordinate vectors to (N, 3)
     coords = np.vstack([coordinates['x'], coordinates['y'], coordinates['z']]).T  # shape (N, 3)
 
@@ -1357,9 +1362,16 @@ def spatial_gaussian_smoothing_on_fc_matrix(A, coordinates, sigma):
     A_smooth = weights @ A @ weights.T
 
     # Step 5 (optional): Enforce symmetry
-    A_smooth = 0.5 * (A_smooth + A_smooth.T)
-
+    # A_smooth = 0.5 * (A_smooth + A_smooth.T)
+    
+    if visualize:
+        try:
+            utils_visualization.draw_projection(A_smooth, 'After Spatial Gaussian Smoothing')
+        except ModuleNotFoundError: 
+            print("utils_visualization not found")
+    
     return A_smooth
+
 # %% Tools
 def remove_idx_manual(A, manual_idxs=[]):
     if len(A.shape) == 1:

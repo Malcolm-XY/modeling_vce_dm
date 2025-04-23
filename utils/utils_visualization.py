@@ -59,14 +59,17 @@ def draw_joint_heatmap_1d(data_dict):
     plt.tight_layout()
     plt.show()
 
-def draw_projection(sample_projection):
+def draw_projection(sample_projection, title=None):
     """
     Visualizes data projections (common for both datasets).
     """
+    if title == None:
+        title = "2D Matrix Visualization"
+    
     if sample_projection.ndim == 2:
         plt.imshow(sample_projection, cmap='viridis')
         plt.colorbar()
-        plt.title("2D Matrix Visualization")
+        plt.title(title)
         plt.show()
     elif sample_projection.ndim == 3 and sample_projection.shape[0] <= 100:
         for i in range(sample_projection.shape[0]):

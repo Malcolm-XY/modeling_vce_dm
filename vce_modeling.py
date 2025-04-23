@@ -65,6 +65,104 @@ def load_global_averages(file_path=None, feature=None, band='joint'):
 
 def compute_volume_conduction_factors(_distance_matrix, method='exponential', params=None):
     """
+    基于距离矩阵计算体积电导效应的因子矩阵，支持多种模型和通用偏移参数:
+    exponential, gaussian, inverse, cutoff, powerlaw, rational_quadratic, generalized_gaussian, sigmoid
+
+    通用新增参数:
+        deviation: 距离偏移 (输入平移), 默认0.0
+        offset: 输出偏移 (常数项), 默认0.0
+
+    Args:
+        _distance_matrix (numpy.ndarray): 电极间的距离矩阵，形状为 (n, n)
+        method (str): 建模方法
+        params (dict): 模型参数字典
+
+    Returns:
+        numpy.ndarray: 因子矩阵，与 distance_matrix 同形状
+    """
+    import numpy as np
+
+    _distance_matrix = np.asarray(_distance_matrix)
+
+    # 默认参数集合，增加 deviation 和 offset
+    default_params = {
+        'exponential': {'sigma': 10.0, 'deviation': 0.0, 'offset': 0.0},
+        'gaussian': {'sigma': 5.0, 'deviation': 0.0, 'offset': 0.0},
+        'inverse': {'sigma': 5.0, 'alpha': 2.0, 'deviation': 0.0, 'offset': 0.0},
+        'cutoff': {'threshold': 5.0, 'factor': 0.5, 'deviation': 0.0, 'offset': 0.0},
+        'powerlaw': {'alpha': 2.0, 'deviation': 0.0, 'offset': 0.0},
+        'rational_quadratic': {'sigma': 5.0, 'alpha': 1.0, 'deviation': 0.0, 'offset': 0.0},
+        'generalized_gaussian': {'sigma': 5.0, 'beta': 2.0, 'deviation': 0.0, 'offset': 0.0},
+        'sigmoid': {'mu': 5.0, 'beta': 1.0, 'deviation': 0.0, 'offset': 0.0},
+    }
+
+    if params is None:
+        if method in default_params:
+            params = default_params[method].copy()
+        else:
+            raise ValueError(f"未提供参数，且方法 '{method}' 没有默认参数")
+    elif method in default_params:
+        method_params = default_params[method].copy()
+        method_params.update(params)
+        params = method_params
+    else:
+        raise ValueError(f"不支持的建模方法: {method}")
+
+    # 通用参数
+    deviation = params.get('deviation', 0.0)
+    offset = params.get('offset', 0.0)
+    _d = _distance_matrix + deviation  # 统一偏移
+    epsilon = 1e-6  # 防止除0或log0
+
+    # 初始化结果矩阵
+    factor_matrix = np.zeros_like(_distance_matrix)
+
+    if method == 'exponential':
+        sigma = params['sigma']
+        factor_matrix = np.exp(-_d / sigma) + offset
+
+    elif method == 'gaussian':
+        sigma = params['sigma']
+        factor_matrix = np.exp(-np.square(_d) / (sigma ** 2)) + offset
+
+    elif method == 'inverse':
+        sigma = params['sigma']
+        alpha = params['alpha']
+        factor_matrix = 1.0 / (1.0 + np.power(_d / sigma, alpha)) + offset
+
+    elif method == 'cutoff':
+        threshold = params['threshold']
+        factor = params['factor']
+        factor_matrix = np.where(_d < threshold, factor + offset, offset)
+
+    elif method == 'powerlaw':
+        alpha = params['alpha']
+        factor_matrix = 1.0 / (np.power(_d, alpha) + epsilon) + offset
+
+    elif method == 'rational_quadratic':
+        sigma = params['sigma']
+        alpha = params['alpha']
+        factor_matrix = np.power(1.0 + (np.square(_d) / (2 * alpha * sigma ** 2)), -alpha) + offset
+
+    elif method == 'generalized_gaussian':
+        sigma = params['sigma']
+        beta = params['beta']
+        factor_matrix = np.exp(-np.power(_d / sigma, beta)) + offset
+
+    elif method == 'sigmoid':
+        mu = params['mu']
+        beta = params['beta']
+        factor_matrix = 1.0 / (1.0 + np.exp((_d - mu) / beta)) + offset
+
+    else:
+        raise ValueError(f"不支持的体积电导建模方法: {method}")
+
+    # 对角线置为1（自我连接）
+    np.fill_diagonal(factor_matrix, 1.0)
+    return factor_matrix
+
+def compute_volume_conduction_factors_basic_model(_distance_matrix, method='exponential', params=None):
+    """
     基于距离矩阵计算体积电导效应的因子矩阵。
     支持多种模型：exponential, gaussian, inverse, cutoff, powerlaw, rational_quadratic, generalized_gaussian, sigmoid
 
