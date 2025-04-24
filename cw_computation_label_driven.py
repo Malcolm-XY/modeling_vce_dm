@@ -8,6 +8,7 @@ Created on Sun Feb 16 23:43:14 2025
 import numpy as np
 import pandas as pd
 import scipy.signal
+from scipy.stats import f_oneway
 
 from utils import utils_feature_loading, utils_visualization, utils_eeg_loading
 
@@ -27,7 +28,8 @@ def up_sampling(data, factor):
     data_upsampled = scipy.signal.resample(data, new_length)
     return data_upsampled
 
-# %% Compute MIs
+# %% Feature Computation
+# Mutual Information
 def compute_mi(x, y):
     """ Fast mutual information computation using histogram method. """
     hist_2d, _, _ = np.histogram2d(x, y, bins=5)
@@ -38,7 +40,62 @@ def compute_mi(x, y):
     nonzero = pxy > 0  # Avoid log(0)
     return np.sum(pxy[nonzero] * np.log(pxy[nonzero] / px_py[nonzero]))
 
-def compute_mis(xs, y, electrodes=None, assemble_electrodes=True, verbose=True):
+# A-NOVA
+def compute_anova(x, y):
+    """
+    Computes one-way ANOVA (analysis of variance) between two groups: x and y.
+
+    Parameters:
+    x (array-like): First sample group.
+    y (array-like): Second sample group.
+
+    Returns:
+    f_stat (float): The computed F-statistic.
+    p_value (float): The associated p-value.
+    """
+    f_stat, p_value = f_oneway(x, y)
+    return f_stat, p_value
+
+# %% Features Computation
+def compute_feature_array(xs, y, method, electrodes=None, verbose=True):
+    method = method.lower()
+    if method not in ['mi', 'a-nova']:
+        raise ValueError(f"method must be one of ['mi', 'a-nova'], got '{method}'")
+        
+    feature_array = []
+    for x in xs:
+        if verbose:
+            print(f"For x in computing feature array: {x.shape}")
+            print(f"For y in computing feature array: {y.shape}")
+        
+        if method == 'mi':
+            feature = compute_mi(x, y)
+        elif method == 'a-nova':
+            # 只取F值，当然你也可以用p值，看你的需求
+            f_stat, p_val = compute_anova(x, y)
+            feature = f_stat  # 或者 feature = p_val
+            
+        feature_array.append(feature)
+    
+    normalized_features = min_max_normalize(feature_array)
+        
+    if electrodes is not None:
+        feature_array_df = pd.DataFrame({'electrodes': electrodes, method: feature_array})
+        normalized_feature_array_df = pd.DataFrame({'electrodes': electrodes, method: normalized_features})
+        
+        if verbose: 
+            feature_array_log = np.log(feature_array_df[method] + 1e-8)  # 防止log(0)
+            utils_visualization.draw_heatmap_1d(feature_array_log, electrodes)
+        
+        return feature_array_df, normalized_feature_array_df
+    
+    if verbose: 
+        feature_array_log = np.log(np.array(feature_array) + 1e-8)
+        utils_visualization.draw_heatmap_1d(feature_array_log, electrodes)
+    
+    return feature_array, normalized_features
+        
+def compute_mis(xs, y, electrodes=None, verbose=True):
     mis = []
     for x in xs:
         print(f"For x in computing mis: {x.shape}")
@@ -132,5 +189,5 @@ if __name__ == "__main__":
     labels_upsampled = up_sampling(labels, 200)
     
     # compute mis_mean
-    subject_range, experiment_range = range(1,2), range(1,4)
+    subject_range, experiment_range = range(1,16), range(1,4)
     mis_mean_, mis_mean_resorted = Compute_MIs_Mean_SEED(subject_range, experiment_range, electrodes, align_method='upsampling', verbose=False)

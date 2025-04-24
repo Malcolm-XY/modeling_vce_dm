@@ -24,15 +24,12 @@ def prune_cw(cw, normalize_method='minmax', transform_method='boxcox'):
 
 # %% Compute CM, get CW as Agent of GCM and RCM
 from utils import utils_feature_loading, utils_visualization
-def preprocessing_cm_global_averaged(feature='pcc'):
+def preprocessing_cm_global_averaged(cm_global_averaged, coordinates):
     # Global averaged connectivity matrix; For subsquent fitting computation
-    connectivity_matrix_global_joint_averaged = vce_modeling.load_global_averages(feature=feature)
-    cm_global_averaged = np.abs(connectivity_matrix_global_joint_averaged)
+    cm_global_averaged = np.abs(cm_global_averaged)
     cm_global_averaged = feature_engineering.normalize_matrix(cm_global_averaged)
     
     # Rebuild CM; By removing bads and Gaussian smoothing
-    coordinates = utils_feature_loading.read_distribution('seed')
-    
     param = {
     'method': 'zscore', 'threshold': 2.5,
     'kernel': 'gaussian',  # idw or 'gaussian'
@@ -67,36 +64,43 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     -------
     cw_target_smooth : np.ndarray of shape (n,)
     distance_matrix : np.ndarray of shape (n, n)
-    connectivity_matrix : np.ndarray of shape (n, n)
+    cm_global_averaged : np.ndarray of shape (n, n)
     """
+    # === 0. Electrodes; Remove specified channels
+    electrodes = np.array(utils_feature_loading.read_distribution('seed')['channel'])
+    electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
+    
     # === 1. Target channel weight
+    global channel_weights
     channel_weights = drawer_channel_weight.get_ranking_weight(ranking_method)
     cw_target = prune_cw(channel_weights.to_numpy())
-
-    # Coordinates for smoothing cw_target
-    coordinates = utils_feature_loading.read_distribution('seed')    
+    # ==== 1.1 Remove specified channels
+    cw_target = feature_engineering.remove_idx_manual(cw_target, idxs_manual_remove)
+    # === 1.2 Coordinates and smoothing
+    coordinates = utils_feature_loading.read_distribution('seed')
+    coordinates = coordinates.drop(idxs_manual_remove)
     cw_target_smooth = feature_engineering.spatial_gaussian_smoothing_on_vector(cw_target, coordinates, 2.0)
 
     # === 2. Distance matrix
     _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
+    # === 2.1 Remove specified channels
+    distance_matrix = feature_engineering.remove_idx_manual(distance_matrix, idxs_manual_remove)
+    # === 2.2 Normalization
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
 
     # === 3. Connectivity matrix
-    connectivity_matrix = preprocessing_cm_global_averaged(feature=feature)
+    connectivity_matrix_global_joint_averaged = vce_modeling.load_global_averages(feature=feature)
+    # === 3.1 Remove specified channels
+    cm_global_averaged = feature_engineering.remove_idx_manual(connectivity_matrix_global_joint_averaged, idxs_manual_remove)
+    # === 3.2 Smoothing
+    cm_global_averaged = preprocessing_cm_global_averaged(cm_global_averaged, coordinates)
 
-    # === 4. Remove specified channels
-    electrodes = np.array(utils_feature_loading.read_distribution('seed')['channel'])
-    
-    electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
-    cw_target_smooth = feature_engineering.remove_idx_manual(cw_target_smooth, idxs_manual_remove)
-    distance_matrix = feature_engineering.remove_idx_manual(distance_matrix, idxs_manual_remove)
-    connectivity_matrix = feature_engineering.remove_idx_manual(connectivity_matrix, idxs_manual_remove)
+    return electrodes, cw_target_smooth, distance_matrix, cm_global_averaged
 
-    return electrodes, cw_target_smooth, distance_matrix, connectivity_matrix
-
+# Here utilized VCE Model/FM=M(DM) Model
 def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix):
-    # FM; VCE Model
-    factor_matrix = vce_modeling.compute_volume_conduction_factors(distance_matrix, method=method, params=params_dict)
+    # FM=M(DM); VCE Model
+    factor_matrix = vce_modeling.compute_volume_conduction_factors_advanced_model(distance_matrix, method, params_dict)
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     
     # RCM; Difference between CM and FM
@@ -126,6 +130,15 @@ def optimize_and_store(name, loss_fn, bounds, param_keys, distance_matrix, conne
 def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix):
     def loss_fn(params):
         loss = np.mean((compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix) - cw_target) ** 2)
+        return loss
+    return loss_fn
+
+def loss_fn_template_by_rank(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix):
+    def loss_fn(params):
+        cw_fitting = compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix)
+        cw_rank_fitting = np.argsort(cw_fitting)
+        cw_rank_target = np.argsort(cw_target)
+        loss = np.mean((cw_rank_fitting - cw_rank_target) ** 2)
         return loss
     return loss_fn
 
@@ -207,7 +220,7 @@ def fitting_advanced_model():
     fitting_method_config = {
         'exponential': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'sigma': p[0], 'deviation': p[1], 'offset': p[2],
                 'scale_a': p[3], 'scale_b': p[4]
@@ -215,7 +228,7 @@ def fitting_advanced_model():
         },
         'gaussian': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'sigma': p[0], 'deviation': p[1], 'offset': p[2],
                 'scale_a': p[3], 'scale_b': p[4]
@@ -223,7 +236,7 @@ def fitting_advanced_model():
         },
         'inverse': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'sigma': p[0], 'alpha': p[1], 'deviation': p[2], 'offset': p[3],
                 'scale_a': p[4], 'scale_b': p[5]
@@ -231,7 +244,7 @@ def fitting_advanced_model():
         },
         'powerlaw': {
             'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 10.0), (1e-6, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'alpha': p[0], 'deviation': p[1], 'offset': p[2],
                 'scale_a': p[3], 'scale_b': p[4]
@@ -239,7 +252,7 @@ def fitting_advanced_model():
         },
         'rational_quadratic': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'sigma': p[0], 'alpha': p[1], 'deviation': p[2], 'offset': p[3],
                 'scale_a': p[4], 'scale_b': p[5]
@@ -247,7 +260,7 @@ def fitting_advanced_model():
         },
         'generalized_gaussian': {
             'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'sigma': p[0], 'beta': p[1], 'deviation': p[2], 'offset': p[3],
                 'scale_a': p[4], 'scale_b': p[5]
@@ -255,7 +268,7 @@ def fitting_advanced_model():
         },
         'sigmoid': {
             'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0), (-5.0, 5.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
             'param_func': lambda p: {
                 'mu': p[0], 'beta': p[1], 'deviation': p[2], 'offset': p[3],
                 'scale_a': p[4], 'scale_b': p[5]
@@ -269,6 +282,7 @@ def fitting_advanced_model():
         results[method], cws_fitting[method] = optimize_and_store(
             method,
             loss_fn_template(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
+            # loss_fn_template_by_rank(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
             config['bounds'],
             config['param_names'],
             distance_matrix, cm_global_averaged
@@ -326,7 +340,7 @@ def sort_ams(ams, labels, original_labels=None):
 # %% Usage
 if __name__ == '__main__':
     # Fittin target and DM
-    channel_manual_remove = [57, 61]
+    channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
     electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('PCC', 
                                                     'label_driven_mi_origin', channel_manual_remove)
 

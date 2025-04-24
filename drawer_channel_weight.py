@@ -203,17 +203,19 @@ def draw_2d_mapping(am, coordinates, text, title='title'):
 
 if __name__ == '__main__':
     # label-driven-MI
-    weights, index = draw_weight_map_from_file(ranking_method='label_driven_mi')
+    # weights, index = draw_weight_map_from_file(ranking_method='label_driven_mi')
 
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    weight_mean_r = weights[index]
-    from utils import utils_visualization
+    # electrodes = utils_feature_loading.read_distribution('seed')['channel']
+    # weight_mean_r = weights[index]
+    # from utils import utils_visualization
 
-    utils_visualization.draw_heatmap_1d(weight_mean_r, electrodes)
+    # utils_visualization.draw_heatmap_1d(weight_mean_r, electrodes)
 
-    # data-driven-MI
-    draw_weight_map_from_file(transformation=None, ranking_method='data_driven_mi')
+    # # data-driven-MI
+    # draw_weight_map_from_file(transformation=None, ranking_method='data_driven_mi')
 
-    draw_weight_map_from_file(transformation=None, ranking_method='data_driven_pcc')
+    # draw_weight_map_from_file(transformation=None, ranking_method='data_driven_pcc')
 
-    draw_weight_map_from_file(transformation=None, ranking_method='data_driven_plv')
+    # draw_weight_map_from_file(transformation=None, ranking_method='data_driven_plv')
+    
+    weight = get_ranking_weight(ranking='label_driven_mi')
