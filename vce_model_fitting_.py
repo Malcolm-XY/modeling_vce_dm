@@ -400,9 +400,11 @@ if __name__ == '__main__':
     sorted_cw_non_modeled = sort_ams(cw_non_modeled, electrodes_original, electrodes_original)
     
     # fitted
+    cws_fitted = {}
     cws_sorted = {}
     for method, cw_fitted in cws_fitting.items():
-        cw_fitted = feature_engineering.insert_idx_manual(cws_fitting[method], channel_manual_remove, value=0)
-        cw_sorted = sort_ams(cw_fitted, electrodes_original, electrodes_original)
-        cws_sorted[method] = cw_sorted
+        cw_fitted_temp = feature_engineering.insert_idx_manual(cws_fitting[method], channel_manual_remove, value=0)
+        cws_fitted[method] = cw_fitted_temp
+        cw_sorted_temp = sort_ams(cw_fitted_temp, electrodes_original, electrodes_original)
+        cws_sorted[method] = cw_sorted_temp
     
