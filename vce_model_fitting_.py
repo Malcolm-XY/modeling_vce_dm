@@ -464,6 +464,33 @@ def draw_scatter_comparison(x, A, B, pltlabels={'title':'title',
     plt.tight_layout()
     plt.show()
 
+def draw_joint_scatter(cws_fitting, cw_target, electrodes, ncols=3):
+    """
+    Draw scatter comparisons between target and each fitted CW.
+    """
+    from sklearn.metrics import mean_squared_error
+
+    n_models = len(cws_fitting)
+    nrows = (n_models + ncols - 1) // ncols
+
+    plt.figure(figsize=(5 * ncols, 4 * nrows))
+    for i, (method, cw) in enumerate(cws_fitting.items(), 1):
+        if cw is None:
+            continue
+        plt.subplot(nrows, ncols, i)
+        mse = mean_squared_error(cw_target, cw)
+        plt.plot(electrodes, cw_target, label='Target', linestyle='--', marker='o', color='black')
+        plt.plot(electrodes, cw, label=f'{method}', marker='x', linestyle=':')
+        plt.title(f'{method.upper()} - MSE: {mse:.4f}')
+        plt.xlabel('Electrodes')
+        plt.ylabel('Channel Weight')
+        plt.xticks(rotation=60)
+        plt.grid(True)
+        plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
+
 def sort_ams(ams, labels, original_labels=None):
     dict_ams_original = pd.DataFrame({'labels': labels, 'ams': ams})
     
@@ -481,6 +508,69 @@ def sort_ams(ams, labels, original_labels=None):
     
     return dict_ams_summary
 
+# %% Save
+import os
+def save_fitting_results(results, save_dir='results', file_name='fitting_results.xlsx'):
+    """
+    Save fitting results (parameters and losses) into an Excel or TXT file.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    results_path = os.path.join(save_dir, file_name)
+    
+    # Organize results into DataFrame
+    data = []
+    for method, result in results.items():
+        if result is None:
+            continue
+        row = {'method': method.upper()}
+        row.update(result['params'])
+        row['loss'] = result['loss']
+        data.append(row)
+    
+    df = pd.DataFrame(data)
+
+    # Save
+    if file_name.endswith('.xlsx'):
+        df.to_excel(results_path, index=False)
+    elif file_name.endswith('.txt'):
+        df.to_csv(results_path, sep='\t', index=False)
+    else:
+        raise ValueError("Unsupported file extension. Use .xlsx or .txt")
+
+    print(f"Fitting results saved to {results_path}")
+
+def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_weights.xlsx'):
+    """
+    将包含多个 DataFrame 的字典保存为一个 Excel 文件，不同的 sheet 存储不同的 DataFrame。
+
+    Args:
+        cws_fitting (dict): 键是 sheet 名，值是 DataFrame 或可以转换成 DataFrame 的数据结构。
+        save_dir (str): 保存目录，默认为 'results'。
+        file_name (str): 保存的文件名，默认为 'channel_weights.xlsx'。
+    """
+
+    # 确保保存目录存在
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 组合完整路径
+    save_path = os.path.join(save_dir, file_name)
+
+    # 写入Excel
+    with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+        for sheet_name, data in cws_fitting.items():
+            # 安全处理sheet名：截断长度，替换非法字符
+            valid_sheet_name = sheet_name[:31].replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace(':', '_').replace('[', '_').replace(']', '_')
+
+            # 如果data不是DataFrame，尝试转换
+            if not isinstance(data, pd.DataFrame):
+                data = pd.DataFrame(data)
+
+            # 写入sheet
+            data.to_excel(writer, sheet_name=valid_sheet_name, index=False)
+
+    print(f"Channel weights successfully saved to {save_path}")
+
+# %% Usage
 # %% Usage
 if __name__ == '__main__':
     # Fittin target and DM
@@ -491,10 +581,37 @@ if __name__ == '__main__':
     # %% Fitting
     results, cws_fitting = fitting_model('basic', 'differ', cw_target, distance_matrix, cm_global_averaged)
     
-    # %% Validation of Fitting Comparison
+    # %% Sort ranks of channel weights based on fitted models
+    # electrodes
+    electrodes_original = np.array(utils_feature_loading.read_distribution('seed')['channel'])
+    
+    # target
+    cw_target_rebuild = feature_engineering.insert_idx_manual(cw_target, channel_manual_remove, value=0)
+    sorted_cw_target = sort_ams(cw_target_rebuild, electrodes_original, electrodes_original)
+    
+    # non-modeled
     cw_non_modeled = np.mean(cm_global_averaged, axis=0)
     cw_non_modeled = feature_engineering.normalize_matrix(cw_non_modeled)
     
+    cw_non_modeled_rebuild = feature_engineering.insert_idx_manual(cw_non_modeled, channel_manual_remove, value=0)
+    sorted_cw_non_modeled = sort_ams(cw_non_modeled_rebuild, electrodes_original, electrodes_original)
+    
+    # fitted
+    cws_fitted = {}
+    cws_sorted = {}
+    for method, cw_fitted in cws_fitting.items():
+        cw_fitted_temp = feature_engineering.insert_idx_manual(cws_fitting[method], channel_manual_remove, value=0)
+        cws_fitted[method] = cw_fitted_temp
+        cw_sorted_temp = sort_ams(cw_fitted_temp, electrodes_original, electrodes_original)
+        cws_sorted[method] = cw_sorted_temp    
+    
+    # %% Save
+    path_currebt = os.getcwd()
+    results_path = os.path.join(os.getcwd(), 'fitting_results')
+    save_fitting_results(results, results_path)
+    save_channel_weights(cws_sorted, results_path)
+    
+    # %% Validation of Fitting Comparison
     pltlabels = {'title':'Comparison of CWs; Before Modeling',
                  'label_x':'Electrodes', 'label_y':'Channel Weight', 
                  'label_A':'CW_LD_MI(Target)', 'label_B':'CW_CM_PCC(Non fitted)'}
@@ -511,6 +628,9 @@ if __name__ == '__main__':
         _pltlabels['label_B'] = 'CW_Recovered_CM_PCC(Fitted)'
         draw_scatter_comparison(electrodes, cw_target, cw_fitting, _pltlabels)
     
+    # joint scatter #################
+    draw_joint_scatter(cws_fitting, cw_target, electrodes)
+    
     # %% Validation of Brain Topography
     # Coordinates
     coordinates = utils_feature_loading.read_distribution('seed')
@@ -525,29 +645,10 @@ if __name__ == '__main__':
     # fitted
     for method, cw_fitted in cws_fitting.items():
         drawer_channel_weight.draw_2d_mapping(cw_fitted, coordinates, electrodes, f'{method}_Modeled(Fitted)')
-        
+    
+    # joint topography #################
+    
     # %% Validation of Heatmap
     cws_fitting['cw_target'] = cw_target
     utils_visualization.draw_joint_heatmap_1d(cws_fitting)
-    
-    # %% Sort ranks of channel weights based on fitted models
-    # electrodes
-    electrodes_original = np.array(utils_feature_loading.read_distribution('seed')['channel'])
-    
-    # target
-    cw_target = feature_engineering.insert_idx_manual(cw_target, channel_manual_remove, value=0)
-    sorted_cw_target = sort_ams(cw_target, electrodes_original, electrodes_original)
-    
-    # non-modeled
-    cw_non_modeled = feature_engineering.insert_idx_manual(cw_non_modeled, channel_manual_remove, value=0)
-    sorted_cw_non_modeled = sort_ams(cw_non_modeled, electrodes_original, electrodes_original)
-    
-    # fitted
-    cws_fitted = {}
-    cws_sorted = {}
-    for method, cw_fitted in cws_fitting.items():
-        cw_fitted_temp = feature_engineering.insert_idx_manual(cws_fitting[method], channel_manual_remove, value=0)
-        cws_fitted[method] = cw_fitted_temp
-        cw_sorted_temp = sort_ams(cw_fitted_temp, electrodes_original, electrodes_original)
-        cws_sorted[method] = cw_sorted_temp
     
