@@ -98,200 +98,341 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     return electrodes, cw_target_smooth, distance_matrix, cm_global_averaged
 
 # Here utilized VCE Model/FM=M(DM) Model
-def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix):
-    # FM=M(DM); VCE Model
+def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix, RCM='differ'):
+    """
+    Compute cw_fitting based on selected RCM method: differ, linear, or linear_ratio.
+    """
+    RCM = RCM.lower()
+
+    # Step 1: Calculate FM
     factor_matrix = vce_modeling.compute_volume_conduction_factors_advanced_model(distance_matrix, method, params_dict)
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
-    
-    # RCM; Difference between CM and FM
+
+    # Step 2: Calculate RCM
     cm, fm = connectivity_matrix, factor_matrix
-    scale_a = params_dict['scale_a']
-    scale_b = params_dict['scale_b']
-    e = 1e-6
-    cm_recovered = cm + scale_a*fm + scale_b*cm/(gaussian_filter(fm, sigma=1)+e)
+    e = 1e-6  # Small value to prevent division by zero
+
+    if RCM == 'differ':
+        cm_recovered = cm - fm
+    elif RCM == 'linear':
+        scale_a = params_dict.get('scale_a', 1.0)
+        cm_recovered = cm + scale_a * fm
+    elif RCM == 'linear_ratio':
+        scale_a = params_dict.get('scale_a', 1.0)
+        scale_b = params_dict.get('scale_b', 1.0)
+        cm_recovered = cm + scale_a * fm + scale_b * cm / (gaussian_filter(fm, sigma=1) + e)
+    else:
+        raise ValueError(f"Unsupported RCM mode: {RCM}")
+
+    # Step 3: Normalize RCM
     cm_recovered = feature_engineering.normalize_matrix(cm_recovered)
-    
-    # RCW; Calculate from RCM
+
+    # Step 4: Compute CW
     global cw_fitting
     cw_fitting = np.mean(cm_recovered, axis=0)
     cw_fitting = prune_cw(cw_fitting)
+
     return cw_fitting
 
 # %% Optimization
-def optimize_and_store(name, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix):
+def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix, RCM='differ'):
     res = differential_evolution(loss_fn, bounds=bounds, strategy='best1bin', maxiter=1000)
     params = dict(zip(param_keys, res.x))
     
     result = {'params': params, 'loss': res.fun}
-    cw_fitting = compute_cw_fitting(name, params, distance_matrix, connectivity_matrix)
+    cw_fitting = compute_cw_fitting(method, params, distance_matrix, connectivity_matrix, RCM)
     
     return result, cw_fitting
 
-def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix):
+def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix, RCM):
     def loss_fn(params):
-        loss = np.mean((compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix) - cw_target) ** 2)
+        loss = np.mean((compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix, RCM) - cw_target) ** 2)
         return loss
     return loss_fn
 
-def loss_fn_template_by_rank(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix):
-    def loss_fn(params):
-        cw_fitting = compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix)
-        cw_rank_fitting = np.argsort(cw_fitting)
-        cw_rank_target = np.argsort(cw_target)
-        loss = np.mean((cw_rank_fitting - cw_rank_target) ** 2)
-        return loss
-    return loss_fn
-
-def fitting_basic_model():
-    results, cws_fitting = {}, {}
+class FittingConfig:
+    """
+    Configuration for fitting models.
+    Provides param_names, bounds, and automatic param_func.
+    """
     
-    fitting_method_config = {
+    @staticmethod
+    def get_config(model_type: str, recovery_type: str):
+        """
+        Get the config dictionary based on model type and recovery type.
+    
+        Args:
+            model_type (str): 'basic' or 'advanced'
+            recovery_type (str): 'differ', 'linear', or 'linear_ratio'
+    
+        Returns:
+            dict: Corresponding config dictionary
+    
+        Raises:
+            ValueError: If input type is invalid
+        """
+        model_type = model_type.lower()
+        recovery_type = recovery_type.lower()
+    
+        if model_type == 'basic' and recovery_type == 'differ':
+            return FittingConfig.config_basic_model_differ_recovery
+        elif model_type == 'advanced' and recovery_type == 'differ':
+            return FittingConfig.config_advanced_model_differ_recovery
+        elif model_type == 'basic' and recovery_type == 'linear':
+            return FittingConfig.config_basic_model_linear_recovery
+        elif model_type == 'advanced' and recovery_type == 'linear':
+            return FittingConfig.config_advanced_model_linear_recovery
+        elif model_type == 'basic' and recovery_type == 'linear_ratio':
+            return FittingConfig.config_basic_model_linear_ratio_recovery
+        elif model_type == 'advanced' and recovery_type == 'linear_ratio':
+            return FittingConfig.config_advanced_model_linear_ratio_recovery
+        else:
+            raise ValueError(f"Invalid model_type '{model_type}' or recovery_type '{recovery_type}'")
+    
+    @staticmethod
+    def make_param_func(param_names):
+        """Auto-generate param_func based on param_names."""
+        return lambda p: {name: p[i] for i, name in enumerate(param_names)}
+
+    config_basic_model_differ_recovery = {
+        'exponential': {
+            'param_names': ['sigma'],
+            'bounds': [(0.1, 20.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma'],
+            'bounds': [(0.1, 20.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha'],
+            'bounds': [(0.1, 10.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0)],
+        },
+    }
+
+    config_advanced_model_differ_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_basic_model_linear_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'scale_a'],
+            'bounds': [(0.1, 10.0), (-1.0, 1.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'scale_a'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_advanced_model_linear_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_basic_model_linear_ratio_recovery = {
         'exponential': {
             'param_names': ['sigma', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]
-            }
         },
         'gaussian': {
             'param_names': ['sigma', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'scale_a': p[1], 'scale_b': p[2]
-            }
         },
         'inverse': {
             'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'alpha': p[1], 'scale_a': p[2], 'scale_b': p[3]
-            }
         },
         'powerlaw': {
             'param_names': ['alpha', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'alpha': p[0], 'scale_a': p[1], 'scale_b': p[2]
-            }
         },
         'rational_quadratic': {
             'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'alpha': p[1], 'scale_a': p[2], 'scale_b': p[3]
-            }
         },
         'generalized_gaussian': {
             'param_names': ['sigma', 'beta', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'beta': p[1], 'scale_a': p[2], 'scale_b': p[3]
-            }
         },
         'sigmoid': {
             'param_names': ['mu', 'beta', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'mu': p[0], 'beta': p[1], 'scale_a': p[2], 'scale_b': p[3]
-            }
-        }
+        },
     }
 
-    for method, config in fitting_method_config.items():
-        print(method)
-        
-        results[method], cws_fitting[method] = optimize_and_store(
-            method,
-            loss_fn_template(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
-            config['bounds'],
-            config['param_names'],
-            distance_matrix, cm_global_averaged
-        )
-    
-    print("=== Fitting Results of All Models (Minimum MSE) ===")
-    for method, result in results.items():
-        print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
-
-    return results, cws_fitting
-
-def fitting_advanced_model():
-    results, cws_fitting = {}, {}
-    
-    fitting_method_config = {
+    config_advanced_model_linear_ratio_recovery = {
         'exponential': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'deviation': p[1], 'offset': p[2],
-                'scale_a': p[3], 'scale_b': p[4]
-            }
         },
         'gaussian': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'deviation': p[1], 'offset': p[2],
-                'scale_a': p[3], 'scale_b': p[4]
-            }
         },
         'inverse': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'alpha': p[1], 'deviation': p[2], 'offset': p[3],
-                'scale_a': p[4], 'scale_b': p[5]
-            }
         },
         'powerlaw': {
             'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'alpha': p[0], 'deviation': p[1], 'offset': p[2],
-                'scale_a': p[3], 'scale_b': p[4]
-            }
         },
         'rational_quadratic': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'alpha': p[1], 'deviation': p[2], 'offset': p[3],
-                'scale_a': p[4], 'scale_b': p[5]
-            }
         },
         'generalized_gaussian': {
             'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'sigma': p[0], 'beta': p[1], 'deviation': p[2], 'offset': p[3],
-                'scale_a': p[4], 'scale_b': p[5]
-            }
         },
         'sigmoid': {
             'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-            'param_func': lambda p: {
-                'mu': p[0], 'beta': p[1], 'deviation': p[2], 'offset': p[3],
-                'scale_a': p[4], 'scale_b': p[5]
-            }
-        }
+        },
     }
-    
-    for method, config in fitting_method_config.items():
-        print(method)
-        
-        results[method], cws_fitting[method] = optimize_and_store(
-            method,
-            loss_fn_template(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
-            # loss_fn_template_by_rank(method, config['param_func'], cw_target, distance_matrix, cm_global_averaged),
-            config['bounds'],
-            config['param_names'],
-            distance_matrix, cm_global_averaged
-        )
-    
-    print("=== Fitting Results of All Models (Minimum MSE) ===")
+
+def fitting_model(model_type='basic', recovery_type='differ', cw_target=None, distance_matrix=None, connectivity_matrix=None):
+    """
+    Perform model fitting across multiple methods.
+
+    Args:
+        model_type (str): 'basic' or 'advanced'
+        recovery_type (str): 'differ', 'linear', 'linear_ratio'
+        cw_target (np.ndarray): Target feature vector
+        distance_matrix (np.ndarray): Distance matrix
+        connectivity_matrix (np.ndarray): Connectivity matrix
+
+    Returns:
+        results (dict): Optimized parameters and losses
+        cws_fitting (dict): Fitted CW vectors
+    """
+
+    results, cws_fitting = {}, {}
+
+    # Load fitting configuration
+    fitting_config = FittingConfig.get_config(model_type, recovery_type)
+
+    for method, config in fitting_config.items():
+        print(f"Fitting Method: {method}")
+
+        param_names = config['param_names']
+        bounds = config['bounds']
+        param_func = FittingConfig.make_param_func(param_names)
+
+        # Build loss function
+        loss_fn = loss_fn_template(method, param_func, cw_target, distance_matrix, connectivity_matrix, RCM=recovery_type)
+
+        # Optimize
+        try:
+            results[method], cws_fitting[method] = optimize_and_store(
+                method,
+                loss_fn,
+                bounds,
+                param_names,
+                distance_matrix,
+                connectivity_matrix,
+                RCM=recovery_type
+            )
+        except Exception as e:
+            print(f"[{method.upper()}] Optimization failed: {e}")
+            results[method], cws_fitting[method] = None, None
+
+    print("\n=== Fitting Results of All Models (Minimum MSE) ===")
     for method, result in results.items():
-        print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
-    
+        if result is not None:
+            print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
+        else:
+            print(f"[{method.upper()}] Optimization Failed.")
+
     return results, cws_fitting
     
 # %% Visualization
@@ -324,18 +465,21 @@ def draw_scatter_comparison(x, A, B, pltlabels={'title':'title',
     plt.show()
 
 def sort_ams(ams, labels, original_labels=None):
-    dict_ams = pd.DataFrame({'ams': ams, 'labels': labels})
+    dict_ams_original = pd.DataFrame({'labels': labels, 'ams': ams})
     
-    sorted_ams = dict_ams.sort_values(by='ams', ascending=False).reset_index()
+    dict_ams_sorted = dict_ams_original.sort_values(by='ams', ascending=False).reset_index()
             
-    idxs_in_original = []
-    for label in sorted_ams['labels']:
-        idx_in_original = list(original_labels).index(label)
-        idxs_in_original.append(idx_in_original)
+    # idxs_in_original = []
+    # for label in dict_ams_sorted['labels']:
+    #     idx_in_original = list(original_labels).index(label)
+    #     idxs_in_original.append(idx_in_original)
     
-    sorted_ams['idxs_in_original'] = idxs_in_original
+    dict_ams_summary = dict_ams_original.copy()
+    # dict_ams_summary['idex_in_original'] = idxs_in_original
     
-    return sorted_ams
+    dict_ams_summary = pd.concat([dict_ams_summary, dict_ams_sorted], axis=1)
+    
+    return dict_ams_summary
 
 # %% Usage
 if __name__ == '__main__':
@@ -345,9 +489,8 @@ if __name__ == '__main__':
                                                     'label_driven_mi_origin', channel_manual_remove)
 
     # %% Fitting
-    # results, cws_fitting = fitting_basic_model()
-    results, cws_fitting = fitting_advanced_model()
-
+    results, cws_fitting = fitting_model('basic', 'differ', cw_target, distance_matrix, cm_global_averaged)
+    
     # %% Validation of Fitting Comparison
     cw_non_modeled = np.mean(cm_global_averaged, axis=0)
     cw_non_modeled = feature_engineering.normalize_matrix(cw_non_modeled)
