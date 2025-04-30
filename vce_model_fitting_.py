@@ -808,17 +808,13 @@ if __name__ == '__main__':
                                                     'label_driven_mi_origin', channel_manual_remove)
 
     # %% Fitting
-    results, cws_fitting = fitting_model('basic', 'differ', cw_target, distance_matrix, cm_global_averaged)
+    results, cws_fitting = fitting_model('basic', 'linear_ratio', cw_target, distance_matrix, cm_global_averaged)
     
-    # %% Insert target cw (LDMI) and cm cw
+    # %% Insert target cw (LDMI) and cm cw non modeled
     cw_non_modeled = np.mean(cm_global_averaged, axis=0)
     cw_non_modeled = feature_engineering.normalize_matrix(cw_non_modeled)
     
-    cws_fitting = {
-        'target': cw_target,
-        'non_modeled': cw_non_modeled,
-        **cws_fitting
-    }
+    cws_fitting = {'target': cw_target,'non_modeled': cw_non_modeled, **cws_fitting}
     
     # %% Sort ranks of channel weights based on fitted models
     # electrodes
