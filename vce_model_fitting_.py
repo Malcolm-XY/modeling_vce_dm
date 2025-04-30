@@ -454,6 +454,7 @@ def sort_ams(ams, labels, original_labels=None):
     return dict_ams_summary
 
 # %% Visualization
+# scatter
 from sklearn.metrics import mean_squared_error
 def draw_scatter_comparison(x, A, B, pltlabels={'title':'title', 
                                                 'label_x':'label_x', 'label_y':'label_y', 
@@ -588,16 +589,12 @@ def draw_scatter_subplots_vertical(x, A, fittings_dict, pltlabels=None, save_pat
     else:
         plt.show()
 
+# topography
 import mne
 def plot_cw_topomap(
-    amps_df,
-    label_col='labels',
-    amp_col='ams',
-    montage=None,
-    distribution_df=None,
-    title='Topomap',
-    normalize=True
-):
+    amps_df, label_col='labels', amp_col='ams',
+    montage=None, distribution_df=None, normalize=True,
+    title='Topomap'):
     """
     绘制 EEG 通道权重脑图。如果提供 distribution_df，则自动创建 montage。
 
@@ -663,6 +660,82 @@ def plot_cw_topomap(
     fig = evoked.plot_topomap(times=0, scalings=1, cmap='viridis', time_format='', show=False, sphere=(0., 0., 0., 1.1))
 
     fig.suptitle(title, fontsize=14)
+    plt.show()
+
+import math
+def plot_joint_topomaps(
+    amps_dict,  # dict[str, pd.DataFrame]
+    label_col='labels', amp_col='ams',
+    montage=None, distribution_df=None,
+    normalize=True, title='Joint Topomap'
+):
+    """
+    按每行两张图的方式绘制多个方法的 EEG 通道权重联合图。
+
+    Args:
+        amps_dict (dict): 例如 {'method1': df1, 'method2': df2, ...}，每个 df 包含通道名和权重。
+        label_col (str): DataFrame 中通道名列名。
+        amp_col (str): DataFrame 中权重列名。
+        montage (mne.channels.DigMontage): 若已存在可重用 montage。
+        distribution_df (pd.DataFrame): 若未提供 montage，可提供坐标 DataFrame 创建之。
+        normalize (bool): 是否对通道坐标归一化。
+        title (str): 整体图标题。
+    """
+    if montage is None:
+        if distribution_df is None:
+            raise ValueError("必须提供 montage 或 distribution_df 之一。")
+        required_cols = {'channel', 'x', 'y', 'z'}
+        if not required_cols.issubset(distribution_df.columns):
+            raise ValueError(f"distribution_df 必须包含列: {required_cols}")
+        ch_pos = {}
+        for _, row in distribution_df.iterrows():
+            pos = np.array([row['x'], row['y'], row['z']], dtype=np.float64)
+            if normalize:
+                norm = np.linalg.norm(pos)
+                if norm > 0:
+                    pos = pos / norm
+            ch_pos[row['channel']] = pos
+        montage = mne.channels.make_dig_montage(ch_pos=ch_pos, coord_frame='head')
+
+    num_plots = len(amps_dict)
+    num_cols = 2
+    num_rows = math.ceil(num_plots / num_cols)
+
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(8, 4 * num_rows))
+    axes = axes.flatten()  # 保证一维数组形式
+
+    for ax, (method, df) in zip(axes, amps_dict.items()):
+        # 提取数据
+        labels = df[label_col].iloc[:, 0].values.tolist()
+        amps = df[amp_col].iloc[:, 0].values
+
+        # 过滤无效通道
+        available_labels = set(montage.ch_names)
+        valid_indices = [i for i, l in enumerate(labels) if l in available_labels]
+        if not valid_indices:
+            print(f"[WARNING] {method}: 无有效通道")
+            continue
+
+        used_labels = [labels[i] for i in valid_indices]
+        used_amps = amps[valid_indices]
+
+        # 创建 evoked 对象
+        info = mne.create_info(ch_names=used_labels, sfreq=1000, ch_types='eeg')
+        evoked = mne.EvokedArray(used_amps[:, np.newaxis], info)
+        evoked.set_montage(montage)
+
+        # 绘图到指定子图
+        mne.viz.plot_topomap(evoked.data[:, 0], evoked.info, axes=ax,
+                             show=False, cmap='viridis', sphere=(0., 0., 0., 1.1))
+        ax.set_title(method, fontsize=12)
+
+    # 关闭多余子图
+    for i in range(num_plots, len(axes)):
+        fig.delaxes(axes[i])
+
+    fig.suptitle(title, fontsize=16)
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.92)
     plt.show()
 
 # %% Save
@@ -742,7 +815,7 @@ if __name__ == '__main__':
     cw_non_modeled = feature_engineering.normalize_matrix(cw_non_modeled)
     
     cws_fitting = {
-        # 'target': cw_target,
+        'target': cw_target,
         'non_modeled': cw_non_modeled,
         **cws_fitting
     }
@@ -787,24 +860,9 @@ if __name__ == '__main__':
     draw_scatter_subplots_vertical(electrodes, cw_target, cws_fitting, pltlabels)
     
     # %% Validation of Brain Topography
-    # Coordinates
-    coordinates = utils_feature_loading.read_distribution('seed')
-    coordinates = coordinates.drop(index=channel_manual_remove)
-
-    # target
-    drawer_channel_weight.draw_2d_mapping(cw_target, coordinates, electrodes, 'Target: Channel Weights of LD_MI')
-    
-    # non-modeled
-    drawer_channel_weight.draw_2d_mapping(cw_non_modeled, coordinates, electrodes, 'Non-Modeled: Channel Weights of CM_PCC')
-    
-    # fitted
-    for method, cw_fitted in cws_fitting.items():
-        drawer_channel_weight.draw_2d_mapping(cw_fitted, coordinates, electrodes, f'{method}_Modeled(Fitted)')
-    
     # mne topography
     distribution = utils_feature_loading.read_distribution('seed')
-
-    plot_cw_topomap(amps_df=cws_sorted['exponential'], title='exponential', distribution_df=distribution)
+    plot_joint_topomaps(amps_dict=cws_sorted, distribution_df=distribution, title="All Method Comparison")
     
     # %% Validation of Heatmap
     cws_fitting['cw_target'] = cw_target
