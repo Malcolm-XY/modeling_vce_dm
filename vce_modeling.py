@@ -261,7 +261,7 @@ if __name__ == '__main__':
     utils_visualization.draw_projection(cm_pcc_joint)
 
     # %% Distance Matrix
-    _, distance_matrix = feature_engineering.compute_distance_matrix('seed')
+    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
     utils_visualization.draw_projection(distance_matrix)
 
@@ -300,11 +300,11 @@ if __name__ == '__main__':
     print(f"The Correlation Similarity Between Stereo Distance Matrix and Connectivity Matrix is: {similarity_corr_ste}")
     
     # %% Factor Matrix
-    factor_matrix = compute_volume_conduction_factors(distance_matrix)
+    factor_matrix = compute_volume_conduction_factors_basic_model(distance_matrix)
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
     
-    factor_matrix_ste = compute_volume_conduction_factors(distance_matrix_ste)
+    factor_matrix_ste = compute_volume_conduction_factors_basic_model(distance_matrix_ste)
     factor_matrix_ste = feature_engineering.normalize_matrix(factor_matrix_ste)
     utils_visualization.draw_projection(factor_matrix_ste)
 
@@ -341,7 +341,7 @@ if __name__ == '__main__':
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
     utils_visualization.draw_projection(distance_matrix)
 
-    factor_matrix = compute_volume_conduction_factors(distance_matrix, method='generalized_gaussian', params={'sigma': 2.27, 'beta': 5.0})
+    factor_matrix = compute_volume_conduction_factors_basic_model(distance_matrix, method='generalized_gaussian', params={'sigma': 2.27, 'beta': 5.0})
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
 

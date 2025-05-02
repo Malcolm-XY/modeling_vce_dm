@@ -166,67 +166,78 @@ def end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120):
 # %% Usage
 import feature_engineering
 import vce_modeling
+from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
 from models import models
+def usage(feature_cm, model, model_fm, model_rcm, param, baseline=False):
+    cnn_model = models.CNN_2layers_adaptive_maxpool_3()
 
-model = models.CNN_2layers_adaptive_maxpool_3()
-
-# %% Labels
-labels = utils_feature_loading.read_labels(dataset='seed')
-y = torch.tensor(np.array(labels)).view(-1)
-
-# %% Features and training
-# VCE model: distance matrix & factor matrix
-_, distance_matrix = feature_engineering.compute_distance_matrix(
-    'seed', 'euclidean', stereo_params={'prominence': 0.5, 'epsilon': 0.01}, visualize=True)
-distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
-utils_visualization.draw_projection(distance_matrix)
-
-factor_matrix = vce_modeling.compute_volume_conduction_factors(
-    distance_matrix, 'sigmoid', {'mu': 2.0, 'beta': 1.0})
-factor_matrix_normalized = feature_engineering.normalize_matrix(factor_matrix)
-utils_visualization.draw_projection(factor_matrix_normalized)
-
-all_results_original = []
-all_results_recovered = []
-
-for sub in range(1, 16):
-    for ex in range(1, 4):
-        subject_id = f"sub{sub}ex{ex}"
-        print(f"Evaluating {subject_id}...")
-        
-        # CM
-        features = utils_feature_loading.read_fcs_mat('seed', subject_id, 'plv')
-        alpha = features['alpha']
-        beta = features['beta']
-        gamma = features['gamma']
-        
-        x = np.stack((alpha, beta, gamma), axis=1)
-
-        # RCM
-        alpha_recovered = alpha - factor_matrix_normalized
-        beta_recovered = beta - factor_matrix_normalized
-        gamma_recovered = gamma - factor_matrix_normalized
-        x_recovered = np.stack((alpha_recovered, beta_recovered, gamma_recovered), axis=1)
-        
-        result_CM = cnn_validation.cnn_cross_validation(model, x, y)
-        result_RCM = cnn_validation.cnn_cross_validation(model, x_recovered, y)
-        
-        # Add identifier to the result
-        result_CM['Identifier'] = f'sub{sub}ex{ex}'
-        result_RCM['Identifier'] = f'sub{sub}ex{ex}'
-        
-        all_results_original.append(result_CM)
-        all_results_recovered.append(result_RCM)
+    # labels
+    labels = utils_feature_loading.read_labels(dataset='seed')
+    y = torch.tensor(np.array(labels)).view(-1)
+    
+    # distance matrix
+    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
+    utils_visualization.draw_projection(dm)
+    
+    # model and parameters
+    # model, model_fm, model_rcm ='exponential', 'basic', 'differ'
+    # param = {'sigma': 0.25}
+    
+    all_results_original = []
+    all_results_rebuilded = []
+    
+    for sub in range(1, 16):
+        for ex in range(1, 4):
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
             
-# print(f'Final Results: {results_entry}')
-print('K-Fold Validation compelete\n')
+            # CM
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+            
+            x = np.stack((alpha, beta, gamma), axis=1)
 
-# %% Save results to XLSX (append mode)
-output_dir = os.path.join(os.getcwd(), 'Results')
-filename_CM = "cnn_validation_CM_PLV.xlsx"
-filename_RCM = "cnn_validation_RCM_PLV.xlsx"
-save_results_to_xlsx_append(all_results_original, output_dir, filename_CM)
-save_results_to_xlsx_append(all_results_recovered, output_dir, filename_RCM)
+            # RCM
+            alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm)
+            beta_rebuilded = cm_rebuild(beta, dm, param, model, model_fm, model_rcm)
+            gamma_rebuilded = cm_rebuild(gamma, dm, param, model, model_fm, model_rcm)
+                
+            x_rebuilded = np.stack((alpha_rebuilded, beta_rebuilded, gamma_rebuilded), axis=1)
+            
+            model_rebuilded = models.CNN_2layers_adaptive_maxpool_3()
+            result_RCM = cnn_validation.cnn_cross_validation(model_rebuilded, x_rebuilded, y)
+            
+            # Add identifier to the result
+            result_RCM['Identifier'] = f'sub{sub}ex{ex}'
+            all_results_rebuilded.append(result_RCM)
+            
+            # baseline
+            if baseline:
+                model_original = models.CNN_2layers_adaptive_maxpool_3()
+                result_CM = cnn_validation.cnn_cross_validation(model_original, x, y)
+                # Add identifier to the result
+                result_CM['Identifier'] = f'sub{sub}ex{ex}'
+                all_results_original.append(result_CM)
+            
+    # print(f'Final Results: {results_entry}')
+    print('K-Fold Validation compelete\n')
+    
+    # %% Save results to XLSX (append mode)
+    output_dir = os.path.join(os.getcwd(), 'Results')
+    filename_CM = f"cnn_validation_CM_{feature_cm.upper()}.xlsx"
+    filename_RCM = f"cnn_validation_RCM_{feature_cm.upper()}.xlsx"
+    save_results_to_xlsx_append(all_results_original, output_dir, filename_CM)
+    save_results_to_xlsx_append(all_results_rebuilded, output_dir, filename_RCM)
+    
+    return all_results_original, all_results_rebuilded
 
-# %% End
-end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+if __name__ == '__main__':
+    model, model_fm, model_rcm ='exponential', 'basic', 'differ'
+    param = {'sigma': 0.25}
+    
+    results_cm, results_rcm = usage('plv', model, model_fm, model_rcm, param, baseline=True)
+    
+    # %% End
+    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
