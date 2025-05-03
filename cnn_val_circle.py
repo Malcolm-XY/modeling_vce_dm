@@ -163,12 +163,34 @@ def end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120):
     if shutdown:
         shutdown_with_countdown(countdown_seconds)
 
+# %% read parameters
+def read_params(model='exponential', model_fm='basic', model_rcm='differ'):
+    token_model_fm = f'{model_fm}_models'
+    if model_rcm == 'differ':
+        token_rcm = 'DRCM'
+    elif model_rcm == 'linear':
+        token_rcm = 'LRCM'
+    elif model_rcm == 'linear_ratio':
+        token_rcm = 'LRRCM'
+        
+    path_current = os.getcwd()
+    path_fitting_results = os.path.join(path_current, 'fitting_results')
+    file_path = os.path.join(path_fitting_results, f'fitting_results({token_model_fm}, {token_rcm}, target_LDMI).xlsx')
+    
+    df = pd.read_excel(file_path).set_index('method')
+    df_dict = df.to_dict(orient='index')
+    
+    model = model.upper()
+    params = df_dict[model]
+    
+    return params
+
 # %% Usage
 import feature_engineering
 import vce_modeling
 from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
 from models import models
-def usage(feature_cm, model, model_fm, model_rcm, param, baseline=False):
+def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
     cnn_model = models.CNN_2layers_adaptive_maxpool_3()
 
     # labels
@@ -178,10 +200,8 @@ def usage(feature_cm, model, model_fm, model_rcm, param, baseline=False):
     # distance matrix
     _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
     utils_visualization.draw_projection(dm)
-    
-    # model and parameters
-    # model, model_fm, model_rcm ='exponential', 'basic', 'differ'
-    # param = {'sigma': 0.25}
+
+    param = read_params(model, model_fm, model_rcm)
     
     all_results_original = []
     all_results_rebuilded = []
@@ -227,17 +247,31 @@ def usage(feature_cm, model, model_fm, model_rcm, param, baseline=False):
     # %% Save results to XLSX (append mode)
     output_dir = os.path.join(os.getcwd(), 'Results')
     filename_CM = f"cnn_validation_CM_{feature_cm.upper()}.xlsx"
-    filename_RCM = f"cnn_validation_RCM_{feature_cm.upper()}.xlsx"
+    
+    if model_fm == 'basic':
+        token_model_fm = 'BFM'
+    elif model_fm == 'advanced':
+        token_model_fm = 'AFM'
+    
+    if model_rcm == 'differ':
+        token_model_rcm = 'DRCM'
+    elif model_rcm == 'linear':
+        token_model_rcm = 'LRCM'
+    elif model_rcm == 'linear_ratio':
+        token_model_rcm = 'LRRCM'
+    
+    filename_RCM = f"cnn_validation_RCM_{feature_cm.upper()};{token_model_fm}({model})_{token_model_rcm}.xlsx"
     save_results_to_xlsx_append(all_results_original, output_dir, filename_CM)
     save_results_to_xlsx_append(all_results_rebuilded, output_dir, filename_RCM)
     
     return all_results_original, all_results_rebuilded
 
 if __name__ == '__main__':
-    model, model_fm, model_rcm ='exponential', 'basic', 'differ'
-    param = {'sigma': 0.25}
+    model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear'
+    # params = read_params(model, model_fm, model_rcm)
     
-    results_cm, results_rcm = usage('plv', model, model_fm, model_rcm, param, baseline=True)
+    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
     # %% End
     end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
