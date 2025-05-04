@@ -267,9 +267,19 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
     return all_results_original, all_results_rebuilded
 
 if __name__ == '__main__':
-    model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear'
-    # params = read_params(model, model_fm, model_rcm)
+    model, model_fm, model_rcm = 'gaussian', 'advanced', 'linear'
+    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+
+    model, model_fm, model_rcm = 'inverse', 'advanced', 'linear'
+    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
+    model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear'
+    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear'
     results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
     results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
