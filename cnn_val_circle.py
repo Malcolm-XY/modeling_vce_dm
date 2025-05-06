@@ -277,33 +277,33 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
     return all_results_original, all_results_rebuilded
 
 if __name__ == '__main__':
-    # model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
-    
-    # model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
-    
-    # model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
-    
-    model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
+    model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear'
     results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
     results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear'
+    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    # model, model_fm, model_rcm = 'exponential', 'basic', 'linear'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    # model, model_fm, model_rcm = 'gaussian', 'basic', 'linear'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
 
-    model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
-    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    # model, model_fm, model_rcm = 'inverse', 'basic', 'linear'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
-    model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
-    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    # model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
-    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
-    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    # model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
     # %% End
-    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
