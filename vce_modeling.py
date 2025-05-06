@@ -13,7 +13,7 @@ import feature_engineering
 from utils import utils_feature_loading
 from utils import utils_visualization
 
-def load_global_averages(file_path=None, feature=None, band='joint'):
+def load_global_averages(file_path=None, feature='pcc', band='joint'):
     """
     读取 HDF5 文件中的 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 数据。
 
@@ -26,13 +26,14 @@ def load_global_averages(file_path=None, feature=None, band='joint'):
         tuple: 包含 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 的元组。
     """
     # 如果没有提供文件路径，则根据特征类型构造默认路径
+    feature = feature.lower()
     if file_path is None:
-        if feature is None:
-            file_path = 'Distribution/fc_global_averages.h5'
-        else:
-            path_current = os.getcwd()
-            file_path = os.path.join(path_current, 'Distribution', 'Connectivity_Matrices_Averaged',
-                                     feature.upper(), f'fc_global_averages_{feature}.h5')
+        if feature == 'pcc':
+            file_path = 'Distribution/Connectivity_Matrices_Averaged/PCC/fc_global_averages_pcc.h5'
+        elif feature == 'pcc_10_15':
+            file_path = 'Distribution/Connectivity_Matrices_Averaged/PCC/fc_global_averages_pcc_10_15.h5'
+        
+        file_path = os.path.join(os.getcwd(), file_path)
 
     # 检查文件是否存在
     if not os.path.exists(file_path):

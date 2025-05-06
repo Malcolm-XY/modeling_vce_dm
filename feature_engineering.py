@@ -1436,7 +1436,7 @@ if __name__ == "__main__":
     # fc_mi_matrices_dreamer = fc_matrices_circle('dreamer', feature='mi', save=True, subject_range=range(1, 2))
     
     # %% Feature Engineering; Compute Average CM
-    # global_joint_average = compute_averaged_fcnetwork(feature='pcc', save=True)
+    global_joint_average = compute_averaged_fcnetwork(feature='pcc', subjects=range(1, 11), experiments=range(1, 4), save=True)
     
     # %% End program actions
     # utils.end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

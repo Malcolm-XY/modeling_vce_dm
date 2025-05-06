@@ -71,7 +71,6 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
     
     # === 1. Target channel weight
-    global channel_weights
     channel_weights = drawer_channel_weight.get_ranking_weight(ranking_method)
     cw_target = prune_cw(channel_weights.to_numpy())
     # ==== 1.1 Remove specified channels
@@ -804,11 +803,11 @@ def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_wei
 if __name__ == '__main__':
     # Fittin target and DM
     channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('PCC', 
-                                                    'label_driven_mi_origin', channel_manual_remove)
+    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
+                                                    'label_driven_mi_origin_10_15', channel_manual_remove)
 
     # %% Fitting
-    results, cws_fitting = fitting_model('basic', 'linear_ratio', cw_target, distance_matrix, cm_global_averaged)
+    results, cws_fitting = fitting_model('advanced', 'linear_ratio', cw_target, distance_matrix, cm_global_averaged)
     
     # %% Insert target cw (LDMI) and cm cw non modeled
     cw_non_modeled = np.mean(cm_global_averaged, axis=0)
