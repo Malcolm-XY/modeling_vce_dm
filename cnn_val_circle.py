@@ -203,8 +203,11 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
 
     param = read_params(model, model_fm, model_rcm)
     
+    global all_results_rebuilded
     all_results_original = []
     all_results_rebuilded = []
+    average_accuracy_rebuilded = 0.0
+    average_accuracy_rebuilded_counter = 0
     
     for sub in range(1, 16):
         for ex in range(1, 4):
@@ -220,18 +223,22 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
             x = np.stack((alpha, beta, gamma), axis=1)
 
             # RCM
-            alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm)
-            beta_rebuilded = cm_rebuild(beta, dm, param, model, model_fm, model_rcm)
-            gamma_rebuilded = cm_rebuild(gamma, dm, param, model, model_fm, model_rcm)
+            alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm, True)
+            beta_rebuilded = cm_rebuild(beta, dm, param, model, model_fm, model_rcm, True)
+            gamma_rebuilded = cm_rebuild(gamma, dm, param, model, model_fm, model_rcm, True)
                 
             x_rebuilded = np.stack((alpha_rebuilded, beta_rebuilded, gamma_rebuilded), axis=1)
             
             model_rebuilded = models.CNN_2layers_adaptive_maxpool_3()
+            global result_RCM
             result_RCM = cnn_validation.cnn_cross_validation(model_rebuilded, x_rebuilded, y)
             
             # Add identifier to the result
             result_RCM['Identifier'] = f'sub{sub}ex{ex}'
             all_results_rebuilded.append(result_RCM)
+            
+            average_accuracy_rebuilded += result_RCM['accuracy']
+            average_accuracy_rebuilded_counter += 1
             
             # baseline
             if baseline:
@@ -240,7 +247,10 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
                 # Add identifier to the result
                 result_CM['Identifier'] = f'sub{sub}ex{ex}'
                 all_results_original.append(result_CM)
-            
+    
+    average_accuracy_rebuilded = {'accuracy': average_accuracy_rebuilded/average_accuracy_rebuilded_counter}
+    all_results_rebuilded.append(average_accuracy_rebuilded)
+    
     # print(f'Final Results: {results_entry}')
     print('K-Fold Validation compelete\n')
     
@@ -267,19 +277,31 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
     return all_results_original, all_results_rebuilded
 
 if __name__ == '__main__':
-    model, model_fm, model_rcm = 'gaussian', 'advanced', 'linear'
+    # model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    # model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'differ'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    # model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
+    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
+    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    
+    model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
     results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
     results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
 
-    model, model_fm, model_rcm = 'inverse', 'advanced', 'linear'
+    model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
     results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
     results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
-    model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear'
+    model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
     results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
     results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
-    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear'
+    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
     results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
     results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
     
