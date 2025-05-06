@@ -112,14 +112,11 @@ def example_usage():
     output_path = os.path.join(os.getcwd(), 'Results', 'svm_knn_comparison.xlsx')
     results.to_excel(output_path, index=True, sheet_name='Comparison Results')
 
-def example_usage_cw_connectivity_matrix():
-    
-
-def example_usage_cw_target():
+def example_usage_cw_control():
     channel_selection_rate = 0.25
     import cw_manager
     
-    channel_weight_df = cw_manager.read_channel_weight_target('label_driven_mi', True)
+    channel_weight_df = cw_manager.read_channel_weight_DD('data_driven_mi', True)
     
     channel_selected = channel_weight_df.index[:int(len(channel_weight_df.index)*channel_selection_rate)]
     
@@ -128,7 +125,31 @@ def example_usage_cw_target():
     y = utils_feature_loading.read_labels('seed')
     
     # features
-    features = utils_feature_loading.read_cfs('seed', 'sub1ex1', 'de_LDS')
+    features = utils_feature_loading.read_cfs('seed', 'sub3ex1', 'de_LDS')
+    alpha = features['alpha'][:, channel_selected]
+    beta = features['beta'][:, channel_selected]
+    gamma = features['gamma'][:, channel_selected]
+    x_selected = np.hstack([alpha, beta, gamma])
+    
+    # SVM Evaluation
+    svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
+    
+    return svm_results
+
+def example_usage_cw_target():
+    channel_selection_rate = 0.25
+    import cw_manager
+    
+    channel_weight_df = cw_manager.read_channel_weight_LD('label_driven_mi', True)
+    
+    channel_selected = channel_weight_df.index[:int(len(channel_weight_df.index)*channel_selection_rate)]
+    
+    # labels
+    from utils import utils_feature_loading
+    y = utils_feature_loading.read_labels('seed')
+    
+    # features
+    features = utils_feature_loading.read_cfs('seed', 'sub3ex1', 'de_LDS')
     alpha = features['alpha'][:, channel_selected]
     beta = features['beta'][:, channel_selected]
     gamma = features['gamma'][:, channel_selected]
@@ -143,7 +164,7 @@ def example_usage_cw_fitting():
     channel_selection_rate = 0.25
     import cw_manager
     
-    model_fm, model_rcm, model = 'basic', 'differ', 'exponential'
+    model_fm, model_rcm, model = 'advanced', 'linear', 'powerlaw'
     channel_weight_df = cw_manager.read_channel_weight_fitting(model_fm, model_rcm, model, True)
     
     channel_selected = channel_weight_df.index[:int(len(channel_weight_df.index)*channel_selection_rate)]
@@ -153,7 +174,7 @@ def example_usage_cw_fitting():
     y = utils_feature_loading.read_labels('seed')
     
     # features
-    features = utils_feature_loading.read_cfs('seed', 'sub1ex1', 'de_LDS')
+    features = utils_feature_loading.read_cfs('seed', 'sub3ex1', 'de_LDS')
     alpha = features['alpha'][:, channel_selected]
     beta = features['beta'][:, channel_selected]
     gamma = features['gamma'][:, channel_selected]
@@ -165,28 +186,10 @@ def example_usage_cw_fitting():
     return svm_results
 
 if __name__ == '__main__':
-    channel_selection_rate = 0.25
-    import cw_manager
+    cotrol = example_usage_cw_control()
+    targrt = example_usage_cw_target()
+    fitting = example_usage_cw_fitting()
     
-    model_fm, model_rcm, model = 'basic', 'differ', 'exponential'
-    channel_weight_df = cw_manager.read_channel_weight_fitting(model_fm, model_rcm, model, True)
-    
-    channel_selected = channel_weight_df.index[:int(len(channel_weight_df.index)*channel_selection_rate)]
-    
-    # labels
-    from utils import utils_feature_loading
-    y = utils_feature_loading.read_labels('seed')
-    
-    # features
-    features = utils_feature_loading.read_cfs('seed', 'sub1ex1', 'de_LDS')
-    alpha = features['alpha'][:, channel_selected]
-    beta = features['beta'][:, channel_selected]
-    gamma = features['gamma'][:, channel_selected]
-    x_selected = np.hstack([alpha, beta, gamma])
-    
-    # SVM Evaluation
-    svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
-
 # if __name__ == '__main__':
 #     import drawer_channel_weight
 #     from utils import utils_feature_loading

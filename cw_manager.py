@@ -8,12 +8,21 @@ Created on Wed May  7 00:41:32 2025
 import os
 import pandas as pd
 
-def read_channel_weight_connectivity_matrix():
-    
-
-def read_channel_weight_target(identifier='label_driven_mi', sort=False):
+def read_channel_weight_DD(identifier='data_driven_pcc', sort=False):
     path_current = os.getcwd()
-    path_file = os.path.join(path_current, 'channel_weights', 'channel_weights_target.xlsx')
+    path_file = os.path.join(path_current, 'channel_weights', 'channel_weights_DD.xlsx')
+    
+    channel_weight = pd.read_excel(path_file, sheet_name=identifier, engine='openpyxl')
+    weight = channel_weight[['labels','ams']]
+    
+    if sort:
+        weight = weight.sort_values(by='ams', ascending=False)
+    
+    return weight
+    
+def read_channel_weight_LD(identifier='label_driven_mi', sort=False):
+    path_current = os.getcwd()
+    path_file = os.path.join(path_current, 'channel_weights', 'channel_weights_LD.xlsx')
     
     channel_weight = pd.read_excel(path_file, sheet_name=identifier, engine='openpyxl')
     weight = channel_weight[['labels','ams']]
@@ -54,6 +63,6 @@ def read_channel_weight_fitting(model_fm='basic', model_rcm='differ', model='exp
     return weight
 
 if __name__ == '__main__':
-    weight_target = read_channel_weight_target(identifier='label_driven_mi', sort=True)
-    weight_fitting = read_channel_weight_fitting(model_fm='basic', model_rcm='differ', model='exponential', sort=False)
-    
+    weight_control = read_channel_weight_DD(identifier='data_driven_pcc', sort=True)
+    weight_target = read_channel_weight_LD(identifier='label_driven_mi', sort=True)
+    weight_fitting = read_channel_weight_fitting(model_fm='basic', model_rcm='differ', model='exponential', sort=True)
