@@ -147,9 +147,6 @@ import cnn_validation
 from models import models
 
 def cnn_evaluation_circle_original_cm(feature_cm, subject_range=range(1, 6), experiment_range=range(1, 4), save=False):
-    # cnn model
-    cnn_model = models.CNN_2layers_adaptive_maxpool_3()
-    
     # labels
     labels = utils_feature_loading.read_labels(dataset='seed')
     y = torch.tensor(np.array(labels)).view(-1)
@@ -169,7 +166,9 @@ def cnn_evaluation_circle_original_cm(feature_cm, subject_range=range(1, 6), exp
             
             x = np.stack((alpha, beta, gamma), axis=1)
             
-            # cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+            # cnn model
+            cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+            # traning and testing
             result_CM = cnn_validation.cnn_cross_validation(cnn_model, x, y)
             
             # Add identifier to the result
@@ -190,15 +189,13 @@ from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
 
 def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm, 
                                        subject_range=range(1, 6), experiment_range=range(1, 4), save=False):
-    # cnn model
-    cnn_model = models.CNN_2layers_adaptive_maxpool_3()
-    
     # labels
     labels = utils_feature_loading.read_labels(dataset='seed')
     y = torch.tensor(np.array(labels)).view(-1)
     
     # distance matrix
     _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"}, visualize=True)
+    dm = feature_engineering.normalize_matrix(dm)
     
     # parameters for construction of FM and RCM
     param = read_params(model, model_fm, model_rcm)
@@ -219,12 +216,14 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
             gamma = features['gamma']
 
             # RCM
-            alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm, True, False)
-            beta_rebuilded = cm_rebuild(beta, dm, param, model, model_fm, model_rcm, True, False)
-            gamma_rebuilded = cm_rebuild(gamma, dm, param, model, model_fm, model_rcm, True, False)
+            alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm, False, False)
+            beta_rebuilded = cm_rebuild(beta, dm, param, model, model_fm, model_rcm, False, False)
+            gamma_rebuilded = cm_rebuild(gamma, dm, param, model, model_fm, model_rcm, False, False)
                 
             x_rebuilded = np.stack((alpha_rebuilded, beta_rebuilded, gamma_rebuilded), axis=1)
             
+            # cnn model
+            cnn_model = models.CNN_2layers_adaptive_maxpool_3()
             # traning and testing
             result_RCM = cnn_validation.cnn_cross_validation(cnn_model, x_rebuilded, y)
             
@@ -262,7 +261,7 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     return all_results_rebuilded
 
 if __name__ == '__main__':
-    # results_cm = cnn_evaluation_circle_original_cm(range(1, 16), save=True)
+    results_cm = cnn_evaluation_circle_original_cm('pcc', range(1, 16), save=True)
     
     model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
     results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
@@ -272,25 +271,25 @@ if __name__ == '__main__':
     results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
                                            subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(1, 16), save=True)
+    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(1, 16), save=True)
+    model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(1, 16), save=True)
+    model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'inverse', 'basic', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(1, 16), save=True)
+    model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(1, 16), save=True)
+    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # # %% End
-    # end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
+    # %% End
+    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
