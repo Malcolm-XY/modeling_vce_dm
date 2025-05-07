@@ -1163,78 +1163,76 @@ def global_padding(matrix, width=81, verbose=True):
 from scipy.stats import boxcox, yeojohnson
 def normalize_matrix(matrix, method='minmax', epsilon=1e-8, param=None):
     """
-    对矩阵进行归一化或变换处理。
+    对矩阵或批量矩阵进行归一化或变换处理。
+    
+    支持方法包括：minmax, max, mean, z-score, boxcox, yeojohnson, sqrt, log, none。
+    可输入单个矩阵 (H, W) 或批量矩阵 (N, H, W)。
 
-    支持方法包括：minmax, max, mean, z-score, boxcox, yeojohnson, sqrt, log, none
-
-    param:
-        - minmax: {'target_range': (a, b)}
-        - boxcox/yeojohnson: {'lmbda': float}
+    参数:
+        matrix (np.ndarray): 输入矩阵或批量矩阵。
+        method (str): 归一化方法。
+        epsilon (float): 防止除零的极小值。
+        param (dict): 额外参数，如 target_range 或 lmbda。
     """
     if param is None:
         param = {}
+    a, b = param.get('target_range', (0, 1))
+    lmbda = param.get('lmbda', None)
 
-    normalized = matrix.copy()
+    # 判断是否批处理
+    is_batch = matrix.ndim == 3
+    matrices = matrix if is_batch else matrix[None, ...]
 
-    if method == 'minmax':
-        min_val = np.min(normalized)
-        max_val = np.max(normalized)
-        scale = max_val - min_val
-        if scale < epsilon:
-            scale = epsilon
-        normed = (normalized - min_val) / scale
-        a, b = param.get('target_range', (0, 1))
-        normalized = normed * (b - a) + a
+    normalized = []
+    for mat in matrices:
+        mat = mat.copy()
 
-    elif method == 'max':
-        max_val = np.max(normalized)
-        if abs(max_val) < epsilon:
-            max_val = epsilon
-        normalized = normalized / max_val
+        if method == 'minmax':
+            min_val, max_val = np.min(mat), np.max(mat)
+            scale = max(max_val - min_val, epsilon)
+            mat = ((mat - min_val) / scale) * (b - a) + a
 
-    elif method == 'mean':
-        mean_val = np.mean(normalized)
-        if abs(mean_val) < epsilon:
-            mean_val = epsilon
-        normalized = normalized / mean_val
+        elif method == 'max':
+            max_val = max(np.max(np.abs(mat)), epsilon)
+            mat = mat / max_val
 
-    elif method == 'z-score':
-        mean_val = np.mean(normalized)
-        std_val = np.std(normalized)
-        if std_val < epsilon:
-            std_val = epsilon
-        normalized = (normalized - mean_val) / std_val
+        elif method == 'mean':
+            mean_val = max(np.mean(mat), epsilon)
+            mat = mat / mean_val
 
-    elif method == 'boxcox':
-        normalized = normalized + epsilon
-        if np.any(normalized <= 0):
-            raise ValueError("Box-Cox 变换要求所有数据 > 0")
-        lmbda = param.get('lmbda', None)
-        flat, _ = boxcox(normalized.flatten(), lmbda=lmbda)
-        normalized = flat.reshape(normalized.shape)
-    
-    elif method == 'yeojohnson':
-        lmbda = param.get('lmbda', None)
-        flat, _ = yeojohnson(normalized.flatten(), lmbda=lmbda)
-        normalized = flat.reshape(normalized.shape)
+        elif method == 'z-score':
+            mean_val, std_val = np.mean(mat), np.std(mat)
+            mat = (mat - mean_val) / max(std_val, epsilon)
 
-    elif method == 'sqrt':
-        if np.any(normalized < 0):
-            raise ValueError("平方根变换要求所有数据 ≥ 0")
-        normalized = np.sqrt(normalized + epsilon)
+        elif method == 'boxcox':
+            mat += epsilon
+            if np.any(mat <= 0):
+                raise ValueError("Box-Cox 要求所有值 > 0")
+            mat = boxcox(mat.flatten(), lmbda=lmbda)[0].reshape(mat.shape)
 
-    elif method == 'log':
-        if np.any(normalized <= 0):
-            raise ValueError("对数变换要求所有数据 > 0")
-        normalized = np.log(normalized + epsilon)
+        elif method == 'yeojohnson':
+            mat = yeojohnson(mat.flatten(), lmbda=lmbda)[0].reshape(mat.shape)
 
-    elif method == 'none':
-        pass  # 原样返回副本
+        elif method == 'sqrt':
+            if np.any(mat < 0):
+                raise ValueError("平方根要求非负值")
+            mat = np.sqrt(mat + epsilon)
 
-    else:
-        raise ValueError(f"不支持的归一化方法: {method}")
+        elif method == 'log':
+            if np.any(mat <= 0):
+                raise ValueError("对数要求值 > 0")
+            mat = np.log(mat + epsilon)
 
-    return normalized
+        elif method == 'none':
+            pass
+
+        else:
+            raise ValueError(f"不支持的归一化方法: {method}")
+
+        normalized.append(mat)
+
+    result = np.stack(normalized) if is_batch else normalized[0]
+    return result
 
 def rebuild_features(data, coordinates, param, visualize=False):
     """
@@ -1438,7 +1436,7 @@ if __name__ == "__main__":
     # fc_mi_matrices_dreamer = fc_matrices_circle('dreamer', feature='mi', save=True, subject_range=range(1, 2))
     
     # %% Feature Engineering; Compute Average CM
-    # global_joint_average = compute_averaged_fcnetwork(feature='pcc', save=True)
+    global_joint_average = compute_averaged_fcnetwork(feature='pcc', subjects=range(1, 11), experiments=range(1, 4), save=True)
     
     # %% End program actions
     # utils.end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

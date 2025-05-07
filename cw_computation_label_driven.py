@@ -268,8 +268,8 @@ if __name__ == "__main__":
     electrodes = utils_feature_loading.read_distribution('seed')['channel']
     
     # compute feature arrays
-    measurement = 'pcc'
-    subject_range, experiment_range = range(1,16), range(1,4)
+    measurement = 'mi'
+    subject_range, experiment_range = range(1,11), range(1,4)
     feature_arrays_mean, feature_arrays_mean_normed = Compute_Feature_Mean_SEED(subject_range, experiment_range, 
                                                 electrodes, 'seed', 'upsampling', measurement)
     utils_visualization.draw_heatmap_1d(feature_arrays_mean[measurement], feature_arrays_mean['electrodes'])

@@ -13,7 +13,7 @@ import feature_engineering
 from utils import utils_feature_loading
 from utils import utils_visualization
 
-def load_global_averages(file_path=None, feature=None, band='joint'):
+def load_global_averages(file_path=None, feature='pcc', band='joint'):
     """
     读取 HDF5 文件中的 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 数据。
 
@@ -26,13 +26,14 @@ def load_global_averages(file_path=None, feature=None, band='joint'):
         tuple: 包含 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 的元组。
     """
     # 如果没有提供文件路径，则根据特征类型构造默认路径
+    feature = feature.lower()
     if file_path is None:
-        if feature is None:
-            file_path = 'Distribution/fc_global_averages.h5'
-        else:
-            path_current = os.getcwd()
-            file_path = os.path.join(path_current, 'Distribution', 'Connectivity_Matrices_Averaged',
-                                     feature.upper(), f'fc_global_averages_{feature}.h5')
+        if feature == 'pcc':
+            file_path = 'Distribution/Connectivity_Matrices_Averaged/PCC/fc_global_averages_pcc.h5'
+        elif feature == 'pcc_10_15':
+            file_path = 'Distribution/Connectivity_Matrices_Averaged/PCC/fc_global_averages_pcc_10_15.h5'
+        
+        file_path = os.path.join(os.getcwd(), file_path)
 
     # 检查文件是否存在
     if not os.path.exists(file_path):
@@ -261,7 +262,7 @@ if __name__ == '__main__':
     utils_visualization.draw_projection(cm_pcc_joint)
 
     # %% Distance Matrix
-    _, distance_matrix = feature_engineering.compute_distance_matrix('seed')
+    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
     utils_visualization.draw_projection(distance_matrix)
 
@@ -300,11 +301,11 @@ if __name__ == '__main__':
     print(f"The Correlation Similarity Between Stereo Distance Matrix and Connectivity Matrix is: {similarity_corr_ste}")
     
     # %% Factor Matrix
-    factor_matrix = compute_volume_conduction_factors(distance_matrix)
+    factor_matrix = compute_volume_conduction_factors_basic_model(distance_matrix)
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
     
-    factor_matrix_ste = compute_volume_conduction_factors(distance_matrix_ste)
+    factor_matrix_ste = compute_volume_conduction_factors_basic_model(distance_matrix_ste)
     factor_matrix_ste = feature_engineering.normalize_matrix(factor_matrix_ste)
     utils_visualization.draw_projection(factor_matrix_ste)
 
@@ -341,7 +342,7 @@ if __name__ == '__main__':
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
     utils_visualization.draw_projection(distance_matrix)
 
-    factor_matrix = compute_volume_conduction_factors(distance_matrix, method='generalized_gaussian', params={'sigma': 2.27, 'beta': 5.0})
+    factor_matrix = compute_volume_conduction_factors_basic_model(distance_matrix, method='generalized_gaussian', params={'sigma': 2.27, 'beta': 5.0})
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
 

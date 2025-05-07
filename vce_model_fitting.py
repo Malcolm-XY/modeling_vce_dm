@@ -6,237 +6,860 @@ Created on Wed Mar 26 17:30:25 2025
 """
 
 import numpy as np
-import seaborn as sns
+import pandas as pd
 import matplotlib.pyplot as plt
 
-from functools import partial
-from scipy.stats import boxcox
-from scipy.optimize import minimize
-from sklearn.preprocessing import MinMaxScaler
+from scipy.ndimage import gaussian_filter
+from scipy.optimize import differential_evolution
 
 import feature_engineering
 import vce_modeling
 import drawer_channel_weight
 
-def apply_transform(x, method):
-    x = x + 1e-6  # avoid log(0) or boxcox(0)
-    if method == 'boxcox':
-        x, _ = boxcox(x)
-    elif method == 'sqrt':
-        x = np.sqrt(x)
-    elif method == 'log':
-        x = np.log(x)
-    elif method == 'none':
-        pass
-    else:
-        raise ValueError(f"Unsupported transform_method: {method}")
-    return x
+# %% Normalize and prune CW
+def prune_cw(cw, normalize_method='minmax', transform_method='boxcox'):
+    cw = feature_engineering.normalize_matrix(cw, transform_method)
+    cw = feature_engineering.normalize_matrix(cw, normalize_method)
+    return cw
 
-def preprocessing_r_target(r, normalize_method, transform_method):
-    r = feature_engineering.normalize_matrix(r, normalize_method)
-    r = apply_transform(r, transform_method)
+# %% Compute CM, get CW as Agent of GCM and RCM
+from utils import utils_feature_loading, utils_visualization
+def preprocessing_cm_global_averaged(cm_global_averaged, coordinates):
+    # Global averaged connectivity matrix; For subsquent fitting computation
+    cm_global_averaged = np.abs(cm_global_averaged)
+    cm_global_averaged = feature_engineering.normalize_matrix(cm_global_averaged)
+    
+    # Rebuild CM; By removing bads and Gaussian smoothing
+    param = {
+    'method': 'zscore', 'threshold': 2.5,
+    'kernel': 'gaussian',  # idw or 'gaussian'
+    'sigma': 5.0,  # only used for gaussian
+    'manual_bad_idx': []}
+    
+    cm_global_averaged = feature_engineering.rebuild_features(cm_global_averaged, coordinates, param, True)
+    
+    # 2D Gaussian Smooth CM
+    # connectivity_matrix = gaussian_filter(connectivity_matrix, sigma=0.5)
+    
+    # Spatial Gaussian Smooth CM
+    cm_global_averaged = feature_engineering.spatial_gaussian_smoothing_on_fc_matrix(cm_global_averaged, coordinates, 5, True)
+    
+    return cm_global_averaged
 
-    return r
+def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_origin', idxs_manual_remove=None):
+    """
+    Prepares smoothed channel weights, distance matrix, and global averaged connectivity matrix,
+    with optional removal of specified bad channels.
 
-def preprocessing_r_fitting(r, normalize_method, transform_method, r_target, mean_align_method):
-    r = feature_engineering.normalize_matrix(r, normalize_method)
-    r = apply_transform(r, transform_method)
+    Parameters
+    ----------
+    feature : str
+        Connectivity feature type (e.g., 'PCC').
+    ranking_method : str
+        Method for computing channel importance weights.
+    idxs_manual_remove : list of int or None
+        Indices of channels to manually remove from all matrices/vectors.
 
-    if mean_align_method == 'match_mean':
-        delta = np.mean(r_target) - np.mean(r)
-        r += delta
+    Returns
+    -------
+    cw_target_smooth : np.ndarray of shape (n,)
+    distance_matrix : np.ndarray of shape (n, n)
+    cm_global_averaged : np.ndarray of shape (n, n)
+    """
+    # === 0. Electrodes; Remove specified channels
+    electrodes = np.array(utils_feature_loading.read_distribution('seed')['channel'])
+    electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
+    
+    # === 1. Target channel weight
+    channel_weights = drawer_channel_weight.get_ranking_weight(ranking_method)
+    cw_target = prune_cw(channel_weights.to_numpy())
+    # ==== 1.1 Remove specified channels
+    cw_target = feature_engineering.remove_idx_manual(cw_target, idxs_manual_remove)
+    # === 1.2 Coordinates and smoothing
+    coordinates = utils_feature_loading.read_distribution('seed')
+    coordinates = coordinates.drop(idxs_manual_remove)
+    cw_target_smooth = feature_engineering.spatial_gaussian_smoothing_on_vector(cw_target, coordinates, 2.0)
 
-    return r
-
-def prepare_target_and_inputs(
-    feature='PCC',
-    ranking_method='label_driven_mi_origin',
-    distance_method='euclidean',
-    normalize_method='minmax',
-    transform_method='boxcox',
-    mean_align_method='match_mean',
-):
-    weights = drawer_channel_weight.get_ranking_weight(ranking_method)
-    r_target = preprocessing_r_target(weights.to_numpy(), normalize_method, transform_method)
-
-    _, distance_matrix = feature_engineering.compute_distance_matrix('seed', method=distance_method, stereo_params={'prominence': 0.5, 'epsilon': 0.01}, visualize=True)
+    # === 2. Distance matrix
+    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
+    # === 2.1 Remove specified channels
+    distance_matrix = feature_engineering.remove_idx_manual(distance_matrix, idxs_manual_remove)
+    # === 2.2 Normalization
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
 
-    global_joint_average = vce_modeling.load_global_averages(feature=feature)
-    connectivity_matrix = feature_engineering.normalize_matrix(global_joint_average)
+    # === 3. Connectivity matrix
+    connectivity_matrix_global_joint_averaged = vce_modeling.load_global_averages(feature=feature)
+    # === 3.1 Remove specified channels
+    cm_global_averaged = feature_engineering.remove_idx_manual(connectivity_matrix_global_joint_averaged, idxs_manual_remove)
+    # === 3.2 Smoothing
+    cm_global_averaged = preprocessing_cm_global_averaged(cm_global_averaged, coordinates)
 
-    preprocessing_fn = partial(
-        preprocessing_r_fitting,
-        normalize_method=normalize_method,
-        transform_method=transform_method,
-        r_target=r_target,
-        mean_align_method=mean_align_method
-    )
+    return electrodes, cw_target_smooth, distance_matrix, cm_global_averaged
 
-    return r_target, distance_matrix, connectivity_matrix, preprocessing_fn
+# Here utilized VCE Model/FM=M(DM) Model
+def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix, RCM='differ'):
+    """
+    Compute cw_fitting based on selected RCM method: differ, linear, or linear_ratio.
+    """
+    RCM = RCM.lower()
 
-def compute_r_fitting(method, params_dict, distance_matrix, connectivity_matrix, preprocessing_fn):
-    factor_matrix = vce_modeling.compute_volume_conduction_factors(distance_matrix, method=method, params=params_dict)
+    # Step 1: Calculate FM
+    factor_matrix = vce_modeling.compute_volume_conduction_factors_advanced_model(distance_matrix, method, params_dict)
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
-    differ_PCC_DM = feature_engineering.normalize_matrix(connectivity_matrix - factor_matrix)
-    r_fitting = np.mean(differ_PCC_DM, axis=0)
-    r_fitting = feature_engineering.normalize_matrix(r_fitting)
-    return preprocessing_fn(r_fitting)
 
-def optimize_and_store(name, loss_fn, x0, bounds, param_keys, distance_matrix, connectivity_matrix, preprocessing_fn):
-    res = minimize(loss_fn, x0=x0, bounds=bounds)
+    # Step 2: Calculate RCM
+    cm, fm = connectivity_matrix, factor_matrix
+    e = 1e-6  # Small value to prevent division by zero
+
+    if RCM == 'differ':
+        cm_recovered = cm - fm
+    elif RCM == 'linear':
+        scale_a = params_dict.get('scale_a', 1.0)
+        cm_recovered = cm + scale_a * fm
+    elif RCM == 'linear_ratio':
+        scale_a = params_dict.get('scale_a', 1.0)
+        scale_b = params_dict.get('scale_b', 1.0)
+        cm_recovered = cm + scale_a * fm + scale_b * cm / (gaussian_filter(fm, sigma=1) + e)
+    else:
+        raise ValueError(f"Unsupported RCM mode: {RCM}")
+
+    # Step 3: Normalize RCM
+    cm_recovered = feature_engineering.normalize_matrix(cm_recovered)
+
+    # Step 4: Compute CW
+    global cw_fitting
+    cw_fitting = np.mean(cm_recovered, axis=0)
+    cw_fitting = prune_cw(cw_fitting)
+
+    return cw_fitting
+
+# %% Optimization
+def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix, RCM='differ'):
+    res = differential_evolution(loss_fn, bounds=bounds, strategy='best1bin', maxiter=1000)
     params = dict(zip(param_keys, res.x))
-    results[name] = {'params': params, 'loss': res.fun}
-    fittings[name] = compute_r_fitting(name, params, distance_matrix, connectivity_matrix, preprocessing_fn)
-
-def loss_fn_template(method_name, param_dict_fn, r_target, distance_matrix, connectivity_matrix, preprocessing_fn):
-    def loss(params):
-        return np.mean((compute_r_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix, preprocessing_fn) - r_target) ** 2)
-    return loss
-
-if __name__ == '__main__':
-    results = {}
-    fittings = {}
-
-    r_target, distance_matrix, connectivity_matrix, preprocessing_fn = prepare_target_and_inputs(
-        feature='PCC',
-        ranking_method='label_driven_mi_origin',
-        distance_method='stereo',
-        transform_method='boxcox',
-    )
-
-    # %% Validation of Fitting Comparison; Before Fitting
-    # Electrode labels
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    if hasattr(electrodes, 'tolist'):
-        electrodes = electrodes.tolist()
     
-    x = electrodes  # Electrode names 作为横轴
+    result = {'params': params, 'loss': res.fun}
+    cw_fitting = compute_cw_fitting(method, params, distance_matrix, connectivity_matrix, RCM)
     
-    # Load and normalize non-modeled r
-    r_non_fitted = vce_modeling.load_global_averages(feature='PCC')
-    r_non_moldeled = np.mean(r_non_fitted, axis=0).reshape(-1, 1)
-    scaler = MinMaxScaler(feature_range=(-2, 0))
-    r_non_moldeled = scaler.fit_transform(r_non_moldeled).flatten()
+    return result, cw_fitting
+
+def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix, RCM):
+    def loss_fn(params):
+        loss = np.mean((compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix, RCM) - cw_target) ** 2)
+        return loss
+    return loss_fn
+
+class FittingConfig:
+    """
+    Configuration for fitting models.
+    Provides param_names, bounds, and automatic param_func.
+    """
     
+    @staticmethod
+    def get_config(model_type: str, recovery_type: str):
+        """
+        Get the config dictionary based on model type and recovery type.
+    
+        Args:
+            model_type (str): 'basic' or 'advanced'
+            recovery_type (str): 'differ', 'linear', or 'linear_ratio'
+    
+        Returns:
+            dict: Corresponding config dictionary
+    
+        Raises:
+            ValueError: If input type is invalid
+        """
+        model_type = model_type.lower()
+        recovery_type = recovery_type.lower()
+    
+        if model_type == 'basic' and recovery_type == 'differ':
+            return FittingConfig.config_basic_model_differ_recovery
+        elif model_type == 'advanced' and recovery_type == 'differ':
+            return FittingConfig.config_advanced_model_differ_recovery
+        elif model_type == 'basic' and recovery_type == 'linear':
+            return FittingConfig.config_basic_model_linear_recovery
+        elif model_type == 'advanced' and recovery_type == 'linear':
+            return FittingConfig.config_advanced_model_linear_recovery
+        elif model_type == 'basic' and recovery_type == 'linear_ratio':
+            return FittingConfig.config_basic_model_linear_ratio_recovery
+        elif model_type == 'advanced' and recovery_type == 'linear_ratio':
+            return FittingConfig.config_advanced_model_linear_ratio_recovery
+        else:
+            raise ValueError(f"Invalid model_type '{model_type}' or recovery_type '{recovery_type}'")
+    
+    @staticmethod
+    def make_param_func(param_names):
+        """Auto-generate param_func based on param_names."""
+        return lambda p: {name: p[i] for i, name in enumerate(param_names)}
+
+    config_basic_model_differ_recovery = {
+        'exponential': {
+            'param_names': ['sigma'],
+            'bounds': [(0.1, 20.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma'],
+            'bounds': [(0.1, 20.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha'],
+            'bounds': [(0.1, 10.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0)],
+        },
+    }
+
+    config_advanced_model_differ_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_basic_model_linear_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'scale_a'],
+            'bounds': [(0.1, 10.0), (-1.0, 1.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'scale_a'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_advanced_model_linear_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
+        },
+    }
+
+    config_basic_model_linear_ratio_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+    }
+
+    config_advanced_model_linear_ratio_recovery = {
+        'exponential': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'gaussian': {
+            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'inverse': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'powerlaw': {
+            'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'rational_quadratic': {
+            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'generalized_gaussian': {
+            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+        'sigmoid': {
+            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
+            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
+        },
+    }
+
+def fitting_model(model_type='basic', recovery_type='differ', cw_target=None, distance_matrix=None, connectivity_matrix=None):
+    """
+    Perform model fitting across multiple methods.
+
+    Args:
+        model_type (str): 'basic' or 'advanced'
+        recovery_type (str): 'differ', 'linear', 'linear_ratio'
+        cw_target (np.ndarray): Target feature vector
+        distance_matrix (np.ndarray): Distance matrix
+        connectivity_matrix (np.ndarray): Connectivity matrix
+
+    Returns:
+        results (dict): Optimized parameters and losses
+        cws_fitting (dict): Fitted CW vectors
+    """
+
+    results, cws_fitting = {}, {}
+
+    # Load fitting configuration
+    fitting_config = FittingConfig.get_config(model_type, recovery_type)
+
+    for method, config in fitting_config.items():
+        print(f"Fitting Method: {method}")
+
+        param_names = config['param_names']
+        bounds = config['bounds']
+        param_func = FittingConfig.make_param_func(param_names)
+
+        # Build loss function
+        loss_fn = loss_fn_template(method, param_func, cw_target, distance_matrix, connectivity_matrix, RCM=recovery_type)
+
+        # Optimize
+        try:
+            results[method], cws_fitting[method] = optimize_and_store(
+                method,
+                loss_fn,
+                bounds,
+                param_names,
+                distance_matrix,
+                connectivity_matrix,
+                RCM=recovery_type
+            )
+        except Exception as e:
+            print(f"[{method.upper()}] Optimization failed: {e}")
+            results[method], cws_fitting[method] = None, None
+
+    print("\n=== Fitting Results of All Models (Minimum MSE) ===")
+    for method, result in results.items():
+        if result is not None:
+            print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
+        else:
+            print(f"[{method.upper()}] Optimization Failed.")
+
+    return results, cws_fitting
+
+# %% Sort
+def sort_ams(ams, labels, original_labels=None):
+    dict_ams_original = pd.DataFrame({'labels': labels, 'ams': ams})
+    
+    dict_ams_sorted = dict_ams_original.sort_values(by='ams', ascending=False).reset_index()
+            
+    # idxs_in_original = []
+    # for label in dict_ams_sorted['labels']:
+    #     idx_in_original = list(original_labels).index(label)
+    #     idxs_in_original.append(idx_in_original)
+    
+    dict_ams_summary = dict_ams_original.copy()
+    # dict_ams_summary['idex_in_original'] = idxs_in_original
+    
+    dict_ams_summary = pd.concat([dict_ams_summary, dict_ams_sorted], axis=1)
+    
+    return dict_ams_summary
+
+# %% Visualization
+# scatter
+from sklearn.metrics import mean_squared_error
+def draw_scatter_comparison(x, A, B, pltlabels={'title':'title', 
+                                                'label_x':'label_x', 'label_y':'label_y', 
+                                                'label_A':'label_A', 'label_B':'label_B'}):
     # Compute MSE
-    from sklearn.metrics import mean_squared_error
-    mse_nonmodeled = mean_squared_error(r_target, r_non_moldeled)
+    mse = mean_squared_error(A, B)
+    
+    # Labels
+    title = pltlabels.get('title')
+    label_x = pltlabels.get('label_x')
+    label_y = pltlabels.get('label_y')
+    label_A = pltlabels.get('label_A')
+    label_B = pltlabels.get('label_B')
     
     # Plot
     plt.figure(figsize=(10, 4))
-    plt.plot(x, r_target, label='r_target', linestyle='--', marker='o', color='black')
-    plt.plot(x, r_non_moldeled, label='r_non_modeled (before)', marker='x', linestyle=':')
-    plt.title(f"Before Modeling - MSE: {mse_nonmodeled:.4f}")
-    plt.xlabel("Electrodes")
-    plt.ylabel("Importance (normalized)")
+    plt.plot(x, A, label=label_A, linestyle='--', marker='o', color='black')
+    plt.plot(x, B, label=label_B, marker='x', linestyle=':')
+    plt.title(f"{title} - MSE: {mse:.4f}")
+    plt.xlabel(label_x)
+    plt.ylabel(label_y)
     plt.xticks(rotation=60)
     plt.tick_params(axis='x', labelsize=8)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
     plt.show()
-    
-    # %% Fitting
-    optimize_and_store('exponential', loss_fn_template('exponential', lambda p: {'sigma': p[0]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0], [(0.1, 20.0)], ['sigma'], distance_matrix, connectivity_matrix, preprocessing_fn)
-    optimize_and_store('gaussian', loss_fn_template('gaussian', lambda p: {'sigma': p[0]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0], [(0.1, 20.0)], ['sigma'], distance_matrix, connectivity_matrix, preprocessing_fn)
-    optimize_and_store('inverse', loss_fn_template('inverse', lambda p: {'sigma': p[0], 'alpha': p[1]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0, 2.0], [(0.1, 20.0), (0.1, 5.0)], ['sigma', 'alpha'], distance_matrix, connectivity_matrix, preprocessing_fn)
-    optimize_and_store('powerlaw', loss_fn_template('powerlaw', lambda p: {'alpha': p[0]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0], [(0.1, 10.0)], ['alpha'], distance_matrix, connectivity_matrix, preprocessing_fn)
-    optimize_and_store('rational_quadratic', loss_fn_template('rational_quadratic', lambda p: {'sigma': p[0], 'alpha': p[1]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0, 1.0], [(0.1, 20.0), (0.1, 10.0)], ['sigma', 'alpha'], distance_matrix, connectivity_matrix, preprocessing_fn)
-    optimize_and_store('generalized_gaussian', loss_fn_template('generalized_gaussian', lambda p: {'sigma': p[0], 'beta': p[1]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0, 1.0], [(0.1, 20.0), (0.1, 5.0)], ['sigma', 'beta'], distance_matrix, connectivity_matrix, preprocessing_fn)
-    optimize_and_store('sigmoid', loss_fn_template('sigmoid', lambda p: {'mu': p[0], 'beta': p[1]}, r_target, distance_matrix, connectivity_matrix, preprocessing_fn), [2.0, 1.0], [(0.1, 10.0), (0.1, 5.0)], ['mu', 'beta'], distance_matrix, connectivity_matrix, preprocessing_fn)
 
-    print("=== Fitting Results of All Models (Minimum MSE) ===")
-    for method, result in results.items():
-        print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
+def draw_scatter_multi_method(x, A, fittings_dict, pltlabels=None, save_path=None):
+    """
+    在同一张图中绘制目标通道权重与多个拟合结果的比较图。
 
-    # %% Validation of Fitting Comparison
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    if hasattr(electrodes, 'tolist'):
-        electrodes = electrodes.tolist()
-    
-    x = electrodes  # Electrode names 作为横轴
-    
-    for method, r_fitting in fittings.items():
-        plt.figure(figsize=(10, 4))  # 每张图单独设置大小
-        plt.plot(x, r_target, label='r_target', linestyle='--', marker='o')
-        plt.plot(x, r_fitting, label=f'r_fitting ({method})', marker='x')
-        plt.title(f"{method.upper()} - MSE: {results[method]['loss']:.4f}")
-        plt.xlabel("Electrodes")
-        plt.ylabel("Importance (normalized)")
-        plt.xticks(rotation=60)
-        plt.tick_params(axis='x', labelsize=8)
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
+    Args:
+        x (array-like): 横轴标签（如电极名或编号）
+        A: target (array-like): 目标通道权重
+        fittings_dict (dict): {method_name: cw_fitting_array}
+        pltlabels (dict): {'title': str, 'label_x': str, 'label_y': str, 'label_target': str}
+        save_path (str or None): 若指定路径则保存图像（如 'figs/cw_comparison.pdf'）
+    """
+    # 默认标签
+    if pltlabels is None:
+        pltlabels = {'title': 'Comparison of Channel Weights across various Models',
+                     'label_x': 'Electrodes', 'label_y': 'Channel Weight',
+                     'label_A': 'target', 'label_B': 'label_B'}
+
+    # 提取标签
+    title = pltlabels.get('title', '')
+    label_x = pltlabels.get('label_x', '')
+    label_y = pltlabels.get('label_y', '')
+    label_A = pltlabels.get('label_A', '')
+    label_B = pltlabels.get('label_B', '')
+
+    # 绘图
+    plt.figure(figsize=(10, 4))
+    plt.plot(x, A, label=label_A, linestyle='-', marker='o', color='black')
+
+    # 绘制多个拟合曲线
+    for method, B in fittings_dict.items():
+        mse = mean_squared_error(A, B)
+        label_B = f"{method} (MSE={mse:.4f})"
+        plt.plot(x, B, label=label_B, linestyle='--', marker='x')  # 颜色自动分配
+
+    # 图形设置
+    plt.title(title)
+    plt.xlabel(label_x)
+    plt.ylabel(label_y)
+    plt.xticks(rotation=60)
+    plt.tick_params(axis='x', labelsize=8)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+
+    # 保存或显示
+    if save_path:
+        plt.savefig(save_path, dpi=300)
+        print(f"[INFO] 图像已保存到 {save_path}")
+    else:
         plt.show()
 
-    # %% Validation of Heatmap
-    heatmap_data = np.vstack([r_target] + [fittings[method] for method in fittings.keys()])
-    heatmap_labels = ['target'] + list(fittings.keys())
+def draw_scatter_subplots_vertical(x, A, fittings_dict, pltlabels=None, save_path=None):
+    """
+    绘制目标通道权重与多个拟合方法的对比子图（单列多行），适用于论文展示。
 
-    plt.figure(figsize=(14, 6))
-    sns.heatmap(heatmap_data, cmap='viridis', cbar=True, xticklabels=False, yticklabels=heatmap_labels, linewidths=0.5, linecolor='gray')
-    plt.title("Heatmap of r_target and All r_fitting Vectors")
-    plt.xlabel("Channel Index")
-    plt.ylabel("Model")
-    plt.tight_layout()
+    Args:
+        x (array-like): 横轴坐标（如电极标签）
+        A: target (array-like): 目标通道权重
+        fittings_dict (dict): {method_name: cw_fitting_array}
+        pltlabels (dict): {'title': str, 'label_x': str, 'label_y': str, 'label_target': str}
+        save_path (str or None): 若指定路径则保存图像（如 'figs/cw_subplot.pdf'）
+    """
+    if pltlabels is None:
+        pltlabels = {'title': 'Comparison of Channel Weights across various Models',
+                     'label_x': 'Electrodes', 'label_y': 'Channel Weight',
+                     'label_A': 'target', 'label_B': 'label_B'}
+
+    label_x = pltlabels.get('label_x', '')
+    label_y = pltlabels.get('label_y', '')
+    label_A = pltlabels.get('label_A', '')
+    label_B = pltlabels.get('label_B', '')
+    suptitle = pltlabels.get('title', '')
+
+    methods = list(fittings_dict.keys())
+    n_methods = len(methods)
+
+    fig, axes = plt.subplots(nrows=n_methods, ncols=1, figsize=(10, 2.5 * n_methods), sharex=True)
+
+    if n_methods == 1:
+        axes = [axes]  # 保证可迭代性
+
+    for ax, method in zip(axes, methods):
+        B = fittings_dict[method]
+        mse = mean_squared_error(A, B)
+
+        ax.plot(x, A, label=label_A, linestyle='-', marker='o', color='black')
+        label_B = f'CW of RCM; FM model: {method} (MSE={mse:.4f})'
+        ax.plot(x, B, label=label_B, linestyle='--', marker='x')
+
+        ax.set_ylabel(label_y)
+        ax.grid(True)
+        ax.legend(loc='best', fontsize=8)
+
+    # 只设置最后一张图的 x label
+    axes[-1].set_xlabel(label_x)
+    axes[-1].tick_params(axis='x', labelrotation=60, labelsize=8)
+
+    fig.suptitle(suptitle, fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+    if save_path:
+        plt.savefig(save_path, dpi=300)
+        print(f"[INFO] 子图已保存到 {save_path}")
+    else:
+        plt.show()
+
+# topography
+import mne
+def plot_cw_topomap(
+    amps_df, label_col='labels', amp_col='ams',
+    montage=None, distribution_df=None, normalize=True,
+    title='Topomap'):
+    """
+    绘制 EEG 通道权重脑图。如果提供 distribution_df，则自动创建 montage。
+
+    Args:
+        amps_df (pd.DataFrame): 包含通道名和权重的 DataFrame。
+        label_col (str): 通道名列名。
+        amp_col (str): 权重列名。
+        montage (mne.channels.DigMontage): 如果已有 montage，可直接传入。
+        distribution_df (pd.DataFrame): 包含 'channel', 'x', 'y', 'z' 列，用于构建自定义 montage。
+        title (str): 图标题。
+        normalize (bool): 是否将 distribution_df 中的坐标归一化。
+    """
+    # Step 1: 从 distribution_df 创建 montage（若提供）
+    if distribution_df is not None:
+        required_cols = {'channel', 'x', 'y', 'z'}
+        if not required_cols.issubset(distribution_df.columns):
+            raise ValueError(f"distribution_df must contain columns: {required_cols}")
+        ch_pos = {}
+        for _, row in distribution_df.iterrows():
+            pos = np.array([row['x'], row['y'], row['z']], dtype=np.float64)
+            if normalize:
+                norm = np.linalg.norm(pos)
+                if norm > 0:
+                    pos = pos / norm
+            ch_pos[row['channel']] = pos
+        montage = mne.channels.make_dig_montage(ch_pos=ch_pos, coord_frame='head')
+
+    if montage is None:
+        raise ValueError("必须提供 montage 或 distribution_df 参数之一。")
+
+    # Step 2: 提取数据
+    all_labels = amps_df[label_col].iloc[:, 0].values.tolist()
+    all_amplitudes = amps_df[amp_col].iloc[:, 0].values
+    amplitudes = np.array(all_amplitudes)
+
+    # Step 3: 过滤无效通道
+    available_labels = set(montage.ch_names)
+    valid_indices, invalid_labels = [], []
+    for i, lbl in enumerate(all_labels):
+        if lbl in available_labels:
+            valid_indices.append(i)
+        else:
+            invalid_labels.append(lbl)
+
+    if len(valid_indices) == 0:
+        print("[WARNING] 无可绘制通道。请检查通道名格式。")
+        if invalid_labels:
+            print("无效通道名如下：", invalid_labels)
+        return
+
+    if invalid_labels:
+        print(f"[INFO] 以下通道未被绘制（未在 montage 中找到）: {invalid_labels}")
+
+    used_labels = [all_labels[i] for i in valid_indices]
+    used_amplitudes = amplitudes[valid_indices]
+
+    # Step 4: 创建 evoked 对象
+    info = mne.create_info(ch_names=used_labels, sfreq=1000, ch_types='eeg')
+    evoked = mne.EvokedArray(used_amplitudes[:, np.newaxis], info)
+    evoked.set_montage(montage)
+
+    # Step 5: 绘图
+    fig = evoked.plot_topomap(times=0, scalings=1, cmap='viridis', time_format='', show=False, sphere=(0., 0., 0., 1.1))
+
+    fig.suptitle(title, fontsize=14)
     plt.show()
+
+import math
+def plot_joint_topomaps(
+    amps_dict,  # dict[str, pd.DataFrame]
+    label_col='labels', amp_col='ams',
+    montage=None, distribution_df=None,
+    normalize=True, title='Joint Topomap'
+):
+    """
+    按每行两张图的方式绘制多个方法的 EEG 通道权重联合图。
+
+    Args:
+        amps_dict (dict): 例如 {'method1': df1, 'method2': df2, ...}，每个 df 包含通道名和权重。
+        label_col (str): DataFrame 中通道名列名。
+        amp_col (str): DataFrame 中权重列名。
+        montage (mne.channels.DigMontage): 若已存在可重用 montage。
+        distribution_df (pd.DataFrame): 若未提供 montage，可提供坐标 DataFrame 创建之。
+        normalize (bool): 是否对通道坐标归一化。
+        title (str): 整体图标题。
+    """
+    if montage is None:
+        if distribution_df is None:
+            raise ValueError("必须提供 montage 或 distribution_df 之一。")
+        required_cols = {'channel', 'x', 'y', 'z'}
+        if not required_cols.issubset(distribution_df.columns):
+            raise ValueError(f"distribution_df 必须包含列: {required_cols}")
+        ch_pos = {}
+        for _, row in distribution_df.iterrows():
+            pos = np.array([row['x'], row['y'], row['z']], dtype=np.float64)
+            if normalize:
+                norm = np.linalg.norm(pos)
+                if norm > 0:
+                    pos = pos / norm
+            ch_pos[row['channel']] = pos
+        montage = mne.channels.make_dig_montage(ch_pos=ch_pos, coord_frame='head')
+
+    num_plots = len(amps_dict)
+    num_cols = 2
+    num_rows = math.ceil(num_plots / num_cols)
+
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(8, 4 * num_rows))
+    axes = axes.flatten()  # 保证一维数组形式
+
+    for ax, (method, df) in zip(axes, amps_dict.items()):
+        # 提取数据
+        labels = df[label_col].iloc[:, 0].values.tolist()
+        amps = df[amp_col].iloc[:, 0].values
+
+        # 过滤无效通道
+        available_labels = set(montage.ch_names)
+        valid_indices = [i for i, l in enumerate(labels) if l in available_labels]
+        if not valid_indices:
+            print(f"[WARNING] {method}: 无有效通道")
+            continue
+
+        used_labels = [labels[i] for i in valid_indices]
+        used_amps = amps[valid_indices]
+
+        # 创建 evoked 对象
+        info = mne.create_info(ch_names=used_labels, sfreq=1000, ch_types='eeg')
+        evoked = mne.EvokedArray(used_amps[:, np.newaxis], info)
+        evoked.set_montage(montage)
+
+        # 绘图到指定子图
+        mne.viz.plot_topomap(evoked.data[:, 0], evoked.info, axes=ax,
+                             show=False, cmap='viridis', sphere=(0., 0., 0., 1.1))
+        ax.set_title(method, fontsize=12)
+
+    # 关闭多余子图
+    for i in range(num_plots, len(axes)):
+        fig.delaxes(axes[i])
+
+    fig.suptitle(title, fontsize=16)
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.92)
+    plt.show()
+
+# %% Save
+import os
+def save_fitting_results(results, save_dir='results', file_name='fitting_results.xlsx'):
+    """
+    Save fitting results (parameters and losses) into an Excel or TXT file.
+    """
+    os.makedirs(save_dir, exist_ok=True)
+    results_path = os.path.join(save_dir, file_name)
     
-    # %% Validation of Brain Topography
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']    
-    # target
-    r_target_ = r_target.copy()
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(r_target_, electrodes)
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # Organize results into DataFrame
+    data = []
+    for method, result in results.items():
+        if result is None:
+            continue
+        row = {'method': method.upper()}
+        row.update(result['params'])
+        row['loss'] = result['loss']
+        data.append(row)
     
-    # non-fitted
-    r_non_fitted = vce_modeling.load_global_averages(feature='PCC')
-    r_non_fitted = np.mean(r_non_fitted, axis=0)
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(r_non_fitted, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    df = pd.DataFrame(data)
+
+    # Save
+    if file_name.endswith('.xlsx'):
+        df.to_excel(results_path, index=False)
+    elif file_name.endswith('.txt'):
+        df.to_csv(results_path, sep='\t', index=False)
+    else:
+        raise ValueError("Unsupported file extension. Use .xlsx or .txt")
+
+    print(f"Fitting results saved to {results_path}")
+
+def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_weights.xlsx'):
+    """
+    将包含多个 DataFrame 的字典保存为一个 Excel 文件，不同的 sheet 存储不同的 DataFrame。
+
+    Args:
+        cws_fitting (dict): 键是 sheet 名，值是 DataFrame 或可以转换成 DataFrame 的数据结构。
+        save_dir (str): 保存目录，默认为 'results'。
+        file_name (str): 保存的文件名，默认为 'channel_weights.xlsx'。
+    """
+
+    # 确保保存目录存在
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # 组合完整路径
+    save_path = os.path.join(save_dir, file_name)
+
+    # 写入Excel
+    with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
+        for sheet_name, data in cws_fitting.items():
+            # 安全处理sheet名：截断长度，替换非法字符
+            valid_sheet_name = sheet_name[:31].replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace(':', '_').replace('[', '_').replace(']', '_')
+
+            # 如果data不是DataFrame，尝试转换
+            if not isinstance(data, pd.DataFrame):
+                data = pd.DataFrame(data)
+
+            # 写入sheet
+            data.to_excel(writer, sheet_name=valid_sheet_name, index=False)
+
+    print(f"Channel weights successfully saved to {save_path}")
+
+# %% Usage
+if __name__ == '__main__':
+    # Fittin target and DM
+    channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
+    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
+                                                    'label_driven_mi_origin_10_15', channel_manual_remove)
+
+    # %% Fitting
+    results, cws_fitting = fitting_model('advanced', 'linear_ratio', cw_target, distance_matrix, cm_global_averaged)
+    
+    # %% Insert target cw (LDMI) and cm cw non modeled
+    cw_non_modeled = np.mean(cm_global_averaged, axis=0)
+    cw_non_modeled = feature_engineering.normalize_matrix(cw_non_modeled)
+    
+    cws_fitting = {'target': cw_target,'non_modeled': cw_non_modeled, **cws_fitting}
+    
+    # %% Sort ranks of channel weights based on fitted models
+    # electrodes
+    electrodes_original = np.array(utils_feature_loading.read_distribution('seed')['channel'])
     
     # fitted
-    r_fitted_g_gaussian = fittings['generalized_gaussian']
-    _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(r_fitted_g_gaussian, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    cws_fitted, cws_sorted = {}, {}
+    for method, cw_fitted in cws_fitting.items():
+        cw_fitted_temp = feature_engineering.insert_idx_manual(cws_fitting[method], channel_manual_remove, value=0)
+        cws_fitted[method] = cw_fitted_temp
+        cw_sorted_temp = sort_ams(cw_fitted_temp, electrodes_original, electrodes_original)
+        cws_sorted[method] = cw_sorted_temp
     
-    # r_fitted_inverse = fittings['inverse']
-    # _, strength_ranked, in_original_indices = weight_map_drawer.rank_and_visualize_fc_strength(r_fitted_inverse, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    # weight_map_drawer.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # %% Save
+    path_currebt = os.getcwd()
+    results_path = os.path.join(os.getcwd(), 'fitting_results')
+    save_fitting_results(results, results_path)
+    save_channel_weights(cws_sorted, results_path)
     
-    # r_fitted_sigmoid = fittings['sigmoid']
-    # _, strength_ranked, in_original_indices = drawer_channel_weight.rank_channel_strength(r_fitted_sigmoid, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
-    # drawer_channel_weight.draw_weight_map_from_data(in_original_indices, strength_ranked['Strength'])
+    # %% Validation of Fitting Comparison
+    pltlabels = {'title':'Comparison of Fitted Channel Weights across various Models',
+                 'label_x':'Electrodes', 'label_y':'Channel Weight', 
+                 'label_A':'CW of target: LD MI', 'label_B':'CW of RCM; by Modeled FM'}
+    
+    # plot by list
+    # pltlabels_non_modeled = pltlabels.copy()
+    # pltlabels_non_modeled['title'] = 'Comparison of CWs; Before Modeling'
+    # draw_scatter_comparison(electrodes, cw_target, cw_non_modeled, pltlabels_non_modeled)
 
-    # %% Resort Fittings; For Saving
-    weights_sigmoid = fittings['sigmoid'].copy()
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    rank_sigmoid = {'weights': weights_sigmoid, 'electrodes': electrodes}
-    # 获取排序后的索引（按权重降序）
-    sorted_indices = np.argsort(-weights_sigmoid)  # 负号表示降序排序
+    # for method, cw_fitting in cws_fitting.items():
+    #     _pltlabels = pltlabels.copy()
+    #     _pltlabels['title'] = f'Comparison of CWs; {method}'
+    #     _pltlabels['label_B'] = 'CW_Recovered_CM_PCC(Fitted)'
+    #     draw_scatter_comparison(electrodes, cw_target, cw_fitting, _pltlabels)
     
-    # 构造排序后的结果
-    ranked_sigmoid = {
-        'weights': weights_sigmoid[sorted_indices],               # 排序后的权重
-        'electrodes': electrodes[sorted_indices],    # 排序后的电极
-        'original_indices': sorted_indices               # 排序后电极在原始 electrodes 中的索引
-    }
+    # joint scatter
+    draw_scatter_multi_method(electrodes, cw_target, cws_fitting, pltlabels)
     
-    weights_g_gaussian = fittings['generalized_gaussian'].copy()
-    from utils import utils_feature_loading
-    electrodes = utils_feature_loading.read_distribution('seed')['channel']
-    rank_g_gaussian = {'weights': weights_sigmoid, 'electrodes': electrodes}
-    # 获取排序后的索引（按权重降序）
-    sorted_indices = np.argsort(-weights_g_gaussian)  # 负号表示降序排序
+    draw_scatter_subplots_vertical(electrodes, cw_target, cws_fitting, pltlabels)
     
-    # 构造排序后的结果
-    ranked_g_gaussian = {
-        'weights': weights_sigmoid[sorted_indices],               # 排序后的权重
-        'electrodes': electrodes[sorted_indices],    # 排序后的电极
-        'original_indices': sorted_indices               # 排序后电极在原始 electrodes 中的索引
-    }
+    # %% Validation of Brain Topography
+    # mne topography
+    distribution = utils_feature_loading.read_distribution('seed')
+    plot_joint_topomaps(amps_dict=cws_sorted, distribution_df=distribution, title="All Method Comparison")
+    
+    # %% Validation of Heatmap
+    cws_fitting['cw_target'] = cw_target
+    utils_visualization.draw_joint_heatmap_1d(cws_fitting)
+    
