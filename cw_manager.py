@@ -66,3 +66,8 @@ if __name__ == '__main__':
     weight_control = read_channel_weight_DD(identifier='data_driven_pcc', sort=True)
     weight_target = read_channel_weight_LD(identifier='label_driven_mi', sort=True)
     weight_fitting = read_channel_weight_fitting(model_fm='basic', model_rcm='differ', model='exponential', sort=True)
+    
+    import drawer_channel_weight
+    channel_weights = drawer_channel_weight.get_ranking_weight('label_driven_mi_origin')
+    
+    weight_target = read_channel_weight_LD(identifier='label_driven_mi', sort=False)

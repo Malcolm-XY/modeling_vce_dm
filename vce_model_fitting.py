@@ -16,6 +16,9 @@ import feature_engineering
 import vce_modeling
 import drawer_channel_weight
 
+# *************************** revise here 20250507
+import cw_manager
+
 # %% Normalize and prune CW
 def prune_cw(cw, normalize_method='minmax', transform_method='boxcox'):
     cw = feature_engineering.normalize_matrix(cw, transform_method)
@@ -71,6 +74,10 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
     
     # === 1. Target channel weight
+    # *************************** revise here 20250507
+    global channel_weights
+    channel_weights = cw_manager.read_channel_weight_LD()
+    
     channel_weights = drawer_channel_weight.get_ranking_weight(ranking_method)
     cw_target = prune_cw(channel_weights.to_numpy())
     # ==== 1.1 Remove specified channels
@@ -828,10 +835,10 @@ if __name__ == '__main__':
         cws_sorted[method] = cw_sorted_temp
     
     # %% Save
-    path_currebt = os.getcwd()
-    results_path = os.path.join(os.getcwd(), 'fitting_results')
-    save_fitting_results(results, results_path)
-    save_channel_weights(cws_sorted, results_path)
+    # path_currebt = os.getcwd()
+    # results_path = os.path.join(os.getcwd(), 'fitting_results')
+    # save_fitting_results(results, results_path)
+    # save_channel_weights(cws_sorted, results_path)
     
     # %% Validation of Fitting Comparison
     pltlabels = {'title':'Comparison of Fitted Channel Weights across various Models',

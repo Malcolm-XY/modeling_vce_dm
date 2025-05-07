@@ -11,7 +11,8 @@ import vce_model_fitting
 
 import numpy as np
 import feature_engineering
-def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='basic', model_rcm='differ', normalize=False):
+def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='basic', model_rcm='differ',
+                  fm_normalization=False, rcm_normalization=False):
     """
     重建功能连接矩阵（Reconstructed Connectivity Matrices, RCM）。
 
@@ -46,6 +47,9 @@ def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='b
     else:
         factor_matrix = compute_fm_advanced(distance_matrix, model, params)
 
+    if fm_normalization:
+        factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
+
     # 重建
     if model_rcm == 'differ':
         cms_rebuilt = cms - factor_matrix
@@ -57,7 +61,7 @@ def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='b
         cms_rebuilt = cms + scale_a * factor_matrix + scale_b * cms / (smoothed_fm + e)
 
     # 归一化（支持批处理）
-    if normalize:
+    if rcm_normalization:
         cms_rebuilt = feature_engineering.normalize_matrix(np.abs(cms_rebuilt))
 
     return cms_rebuilt
