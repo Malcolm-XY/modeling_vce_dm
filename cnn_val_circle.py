@@ -140,16 +140,128 @@ def save_results_to_xlsx_append(results, output_dir, filename, sheet_name='K-Fol
     print(f"Results successfully saved to: {output_path}")
     return output_path
 
-# %% Usage
-import feature_engineering
-from utils import utils_feature_loading, utils_visualization
-import vce_modeling
-from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
-
+# %% control; original cm
 import torch
+import feature_engineering
 import cnn_validation
 from models import models
 
+def cnn_evaluation_circle_original_cm(feature_cm, subject_range=range(1, 6), experiment_range=range(1, 4), save=False):
+    # cnn model
+    cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+    
+    # labels
+    labels = utils_feature_loading.read_labels(dataset='seed')
+    y = torch.tensor(np.array(labels)).view(-1)
+    
+    # data and evaluation circle
+    all_results_original = []
+    for sub in subject_range:
+        for ex in experiment_range:
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
+            
+            # CM
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+            
+            x = np.stack((alpha, beta, gamma), axis=1)
+            
+            # cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+            result_CM = cnn_validation.cnn_cross_validation(cnn_model, x, y)
+            
+            # Add identifier to the result
+            result_CM['Identifier'] = f'sub{sub}ex{ex}'
+            
+            all_results_original.append(result_CM)
+    
+    # save
+    output_dir = os.path.join(os.getcwd(), 'results_cnn_evaluation')
+    filename_CM = "cnn_validation_CM_PCC.xlsx"
+    if save: save_results_to_xlsx_append(all_results_original, output_dir, filename_CM)
+    
+    return all_results_original
+
+
+from utils import utils_feature_loading, utils_visualization
+from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
+
+def cnn_evaluation_circle_recovered_cm(feature_cm, model, model_fm, model_rcm, 
+                                       subject_range=range(1, 6), experiment_range=range(1, 4), save=False):
+    # cnn model
+    cnn_model = models.CNN_2layers_adaptive_maxpool_3()
+    
+    # labels
+    labels = utils_feature_loading.read_labels(dataset='seed')
+    y = torch.tensor(np.array(labels)).view(-1)
+    
+    # distance matrix
+    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"}, visualize=True)
+    
+    # parameters for construction of FM and RCM
+    param = read_params(model, model_fm, model_rcm)
+    
+    # data and evaluation circle
+    all_results_rebuilded = []
+    average_accuracy_rebuilded, average_accuracy_rebuilded_counter = 0.0, 0
+    
+    for sub in subject_range:
+        for ex in experiment_range:
+            subject_id = f"sub{sub}ex{ex}"
+            print(f"Evaluating {subject_id}...")
+            
+            # CM
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
+
+            # RCM
+            alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm, False)
+            beta_rebuilded = cm_rebuild(beta, dm, param, model, model_fm, model_rcm, False)
+            gamma_rebuilded = cm_rebuild(gamma, dm, param, model, model_fm, model_rcm, False)
+                
+            x_rebuilded = np.stack((alpha_rebuilded, beta_rebuilded, gamma_rebuilded), axis=1)
+            
+            # traning and testing
+            result_RCM = cnn_validation.cnn_cross_validation(cnn_model, x_rebuilded, y)
+            
+            # Add identifier to the result
+            result_RCM['Identifier'] = f'sub{sub}ex{ex}'
+            all_results_rebuilded.append(result_RCM)
+            
+            average_accuracy_rebuilded += result_RCM['accuracy']
+            average_accuracy_rebuilded_counter += 1
+
+    average_accuracy_rebuilded = {'accuracy': average_accuracy_rebuilded/average_accuracy_rebuilded_counter}
+    all_results_rebuilded.append(average_accuracy_rebuilded)
+    
+    # print(f'Final Results: {results_entry}')
+    print('K-Fold Validation compelete\n')
+    
+    # save
+    output_dir = os.path.join(os.getcwd(), 'results_cnn_evaluation')
+    
+    if model_fm == 'basic':
+        token_model_fm = 'BFM'
+    elif model_fm == 'advanced':
+        token_model_fm = 'AFM'
+    
+    if model_rcm == 'differ':
+        token_model_rcm = 'DRCM'
+    elif model_rcm == 'linear':
+        token_model_rcm = 'LRCM'
+    elif model_rcm == 'linear_ratio':
+        token_model_rcm = 'LRRCM'
+    
+    filename_RCM = f"cnn_validation_RCM_{feature_cm.upper()};{token_model_fm}({model})_{token_model_rcm}.xlsx"
+    if save: save_results_to_xlsx_append(all_results_rebuilded, output_dir, filename_RCM)
+    
+    return all_results_rebuilded
+
+# %% Usage
 def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
     # labels
     labels = utils_feature_loading.read_labels(dataset='seed')
@@ -235,33 +347,35 @@ def usage(feature_cm, model, model_fm, model_rcm, baseline=False):
     return all_results_original, all_results_rebuilded
 
 if __name__ == '__main__':
-    model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear'
-    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    # results_cm = cnn_evaluation_circle_original_cm(range(1, 16), save=True)
+    
+    model, model_fm, model_rcm = 'exponential', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
+    
+    model, model_fm, model_rcm = 'gaussian', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
     model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear'
-    results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
-
-    # model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=False)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=False)
+    model, model_fm, model_rcm = 'inverse', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
-    # results_cm, results_rcm = usage('pcc', model, model_fm, model_rcm, baseline=True)
-    # results_cm_plv, results_rcm_plv = usage('plv', model, model_fm, model_rcm, baseline=True)
+    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_recovered_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(1, 16), save=True)
     
-    # %% End
-    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
+    # # %% End
+    # end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
