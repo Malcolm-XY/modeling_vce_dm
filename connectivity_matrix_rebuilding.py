@@ -12,7 +12,7 @@ import vce_model_fitting
 import numpy as np
 import feature_engineering
 def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='basic', model_rcm='differ',
-                  fm_normalization=False, rcm_normalization=False):
+                  fm_normalization=True, rcm_normalization=False):
     """
     重建功能连接矩阵（Reconstructed Connectivity Matrices, RCM）。
 
