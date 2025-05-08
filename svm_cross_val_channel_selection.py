@@ -13,6 +13,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 
+# %% svm foundation
 def train_and_evaluate_svm(X_train, Y_train, X_val, Y_val):
     model = SVC(kernel='rbf', C=1, gamma='scale')
     model.fit(X_train, Y_train)
@@ -95,6 +96,7 @@ def k_fold_cross_validation_ml(X, Y, k_folds=5, use_sequential_split=True, model
 
     return avg_results
 
+# %% example usage
 def example_usage():
     # Example Usage
     # Replace these with your actual data
@@ -112,11 +114,45 @@ def example_usage():
     output_path = os.path.join(os.getcwd(), 'Results', 'svm_knn_comparison.xlsx')
     results.to_excel(output_path, index=True, sheet_name='Comparison Results')
 
+# %% usage
+import cw_manager
+from utils import utils_feature_loading
+def evaluation_cw_control_circle(feature='de_LDS', 
+                                 subject_range=range(1, 16), experiment_range=range(1, 4), 
+                                 selection_rate=1):
+    # manage index of selected channels; features
+    channel_weight_df = cw_manager.read_channel_weight_DD('data_driven_pcc', True)
+    channel_selected = channel_weight_df.index[:int(len(channel_weight_df.index)*selection_rate)]
+    
+    # labels
+    y = utils_feature_loading.read_labels('seed')
+    
+    # evaluation circle
+    results = []
+    for sub in subject_range:
+        for ex in experiment_range:
+            
+            # features
+            features = utils_feature_loading.read_cfs('seed', f'sub{sub}ex{ex}', feature)
+            alpha = features['alpha'][:, channel_selected]
+            beta = features['beta'][:, channel_selected]
+            gamma = features['gamma'][:, channel_selected]
+            x_selected = np.hstack([alpha, beta, gamma])
+            
+            # svm evaluation
+            svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
+            
+            results.append(svm_results)
+    
+    print('Evaluation compelete\n')
+    
+    return results
+    
 def example_usage_cw_control():
     channel_selection_rate = 0.25
     import cw_manager
     
-    channel_weight_df = cw_manager.read_channel_weight_DD('data_driven_mi', True)
+    channel_weight_df = cw_manager.read_channel_weight_DD('data_driven_pcc', True)
     
     channel_selected = channel_weight_df.index[:int(len(channel_weight_df.index)*channel_selection_rate)]
     

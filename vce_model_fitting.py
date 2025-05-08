@@ -14,9 +14,6 @@ from scipy.optimize import differential_evolution
 
 import feature_engineering
 import vce_modeling
-import drawer_channel_weight
-
-# *************************** revise here 20250507
 import cw_manager
 
 # %% Normalize and prune CW
@@ -74,11 +71,7 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
     
     # === 1. Target channel weight
-    # *************************** revise here 20250507
-    global channel_weights
-    channel_weights = cw_manager.read_channel_weight_LD()
-    
-    channel_weights = drawer_channel_weight.get_ranking_weight(ranking_method)
+    channel_weights = cw_manager.read_channel_weight_LD(identifier='label_driven_mi', sort=False)['ams']
     cw_target = prune_cw(channel_weights.to_numpy())
     # ==== 1.1 Remove specified channels
     cw_target = feature_engineering.remove_idx_manual(cw_target, idxs_manual_remove)
@@ -112,6 +105,8 @@ def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix
 
     # Step 1: Calculate FM
     factor_matrix = vce_modeling.compute_volume_conduction_factors_advanced_model(distance_matrix, method, params_dict)
+    
+    # *************************** here may should be revised 20250508
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
 
     # Step 2: Calculate RCM
