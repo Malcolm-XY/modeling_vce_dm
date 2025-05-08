@@ -14,11 +14,12 @@ from utils import utils_feature_loading
 def compute_mean_functional_connectivity(feature, subject_range=range(1,16), experiment_range=range(1,4), band='joint'):
     band = band.lower()
 
+    global data
     data = []
     for sub in subject_range:
         for ex in experiment_range:
             if band == 'joint':
-                features = utils_feature_loading.read_fcs(dataset='seed', identifier=f'sub{sub}ex{ex}', feature=feature)
+                features = utils_feature_loading.read_fcs_mat(dataset='seed', identifier=f'sub{sub}ex{ex}', feature=feature)
                 alpha = features['alpha']
                 beta = features['beta']
                 gamma = features['gamma']
@@ -39,7 +40,14 @@ def compute_mean_functional_connectivity(feature, subject_range=range(1,16), exp
 
 # %% Example Usage
 if __name__ == '__main__':
-    feature_mean = compute_mean_functional_connectivity('pcc', subject_range=range(1,11), experiment_range=range(1,4))
+    feature_mean = compute_mean_functional_connectivity('pcc', subject_range=range(1,16), experiment_range=range(1,2))
+    
+    import feature_engineering
+    feature_mean_ = feature_engineering.compute_averaged_fcnetwork('pcc', subjects=range(1, 16), 
+                                                                     experiments=range(1, 4), draw=True, save=False)
+    
+    import vce_modeling
+    feature_mean__ = vce_modeling.load_global_averages(feature='pcc')
     
     # # %% Test
     # # data = read_functional_connectivity('sub1ex1_alpha', 'pcc')
