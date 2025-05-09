@@ -48,7 +48,3 @@ if __name__ == '__main__':
     
     import vce_modeling
     feature_mean__ = vce_modeling.load_global_averages(feature='pcc')
-    
-    # # %% Test
-    # # data = read_functional_connectivity('sub1ex1_alpha', 'pcc')
-    # data_ = utils_feature_loading.read_fcs('seed', 'sub1ex1', 'pcc', 'alpha')
