@@ -64,6 +64,54 @@ def load_global_averages(file_path=None, feature='pcc', band='joint'):
 
     return global_average
 
+def load_global_averaged_mat(file_path=None, feature='pcc', band='joint'):
+    """
+    读取 HDF5 文件中的 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 数据。
+
+    Args:
+        band: Select Frequency Band of EEG Data
+        file_path (str, optional): HDF5 文件的完整路径。若为 None，则根据 feature 参数构造路径。
+        feature (str, optional): 特征类型，如 'PCC'。仅当 file_path 为 None 时使用。
+
+    Returns:
+        tuple: 包含 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 的元组。
+    """
+    # 如果没有提供文件路径，则根据特征类型构造默认路径
+    feature = feature.lower()
+    if file_path is None:
+        if feature == 'pcc':
+            file_path = 'cm_global_averaged/fc_global_averaged_pcc_mat.h5'
+        elif feature == 'pcc_10_15':
+            file_path = 'cm_global_averaged/fc_global_averaged_pcc_mat_10_15.h5'
+        elif feature == 'plv':
+            file_path = 'cm_global_averaged/fc_global_averaged_plv_mat.h5'
+        
+        file_path = os.path.join(os.getcwd(), file_path)
+
+    # 检查文件是否存在
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+
+    # 读取数据
+    with h5py.File(file_path, 'r') as f:
+        global_alpha_average = f['alpha'][:]
+        global_beta_average = f['beta'][:]
+        global_gamma_average = f['gamma'][:]
+        global_joint_average = f['joint'][:]
+
+    if band == 'joint':
+        global_average = global_joint_average
+    elif band == 'beta':
+        global_average = global_beta_average
+    elif band == 'gamma':
+        global_average = global_gamma_average
+    elif band == 'alpha':
+        global_average = global_alpha_average
+
+    else: raise NotImplementedError
+
+    return global_average
+
 def compute_volume_conduction_factors_basic_model(_distance_matrix, method='exponential', params=None):
     """
     基于距离矩阵计算体积电导效应的因子矩阵。

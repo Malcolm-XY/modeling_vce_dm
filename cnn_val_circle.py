@@ -66,18 +66,12 @@ def end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120):
         shutdown_with_countdown(countdown_seconds)
 
 # %% read parameters/save
-def read_params(model='exponential', model_fm='basic', model_rcm='differ'):
-    token_model_fm = f'{model_fm}_models'
-    if model_rcm == 'differ':
-        token_rcm = 'DRCM'
-    elif model_rcm == 'linear':
-        token_rcm = 'LRCM'
-    elif model_rcm == 'linear_ratio':
-        token_rcm = 'LRRCM'
-        
+def read_params(model='exponential', model_fm='basic', model_rcm='differ', folder='fitting_results'):
+    identifier = f'{model_fm.lower()}_fm_{model_rcm.lower()}_rcm'
+    
     path_current = os.getcwd()
-    path_fitting_results = os.path.join(path_current, 'fitting_results')
-    file_path = os.path.join(path_fitting_results, f'fitting_results({token_model_fm}, {token_rcm}, target_LDMI).xlsx')
+    path_fitting_results = os.path.join(path_current, folder)
+    file_path = os.path.join(path_fitting_results, f'fitting_results({identifier}).xlsx')
     
     df = pd.read_excel(file_path).set_index('method')
     df_dict = df.to_dict(orient='index')
@@ -158,11 +152,17 @@ def cnn_evaluation_circle_original_cm(feature_cm, subject_range=range(1, 6), exp
             subject_id = f"sub{sub}ex{ex}"
             print(f"Evaluating {subject_id}...")
             
-            # CM
+            # CM/MAT
             features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
             alpha = features['alpha']
             beta = features['beta']
             gamma = features['gamma']
+            
+            # CM/H5
+            # features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            # alpha = features['alpha']
+            # beta = features['beta']
+            # gamma = features['gamma']
             
             x = np.stack((alpha, beta, gamma), axis=1)
             
@@ -198,7 +198,7 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     dm = feature_engineering.normalize_matrix(dm)
     
     # parameters for construction of FM and RCM
-    param = read_params(model, model_fm, model_rcm)
+    param = read_params(model, model_fm, model_rcm, folder='fitting_results')
     
     # data and evaluation circle
     all_results_rebuilded = []
@@ -209,11 +209,17 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
             subject_id = f"sub{sub}ex{ex}"
             print(f"Evaluating {subject_id}...")
             
-            # CM
+            # CM/MAT
             features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
             alpha = features['alpha']
             beta = features['beta']
             gamma = features['gamma']
+
+            # CM/H5
+            # features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            # alpha = features['alpha']
+            # beta = features['beta']
+            # gamma = features['gamma']
 
             # RCM
             alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm, True, False)
@@ -243,30 +249,23 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     # save
     output_dir = os.path.join(os.getcwd(), 'results_cnn_evaluation')
     
-    if model_fm == 'basic':
-        token_model_fm = 'BFM'
-    elif model_fm == 'advanced':
-        token_model_fm = 'AFM'
+    identifier = f'{model_fm.lower()}_fm_{model_rcm.lower()}_rcm'
+    filename_RCM = f"cnn_validation_RCM({identifier})_({model
     
-    if model_rcm == 'differ':
-        token_model_rcm = 'DRCM'
-    elif model_rcm == 'linear':
-        token_model_rcm = 'LRCM'
-    elif model_rcm == 'linear_ratio':
-        token_model_rcm = 'LRRCM'
     
-    filename_RCM = f"cnn_validation_RCM_{feature_cm.upper()};{token_model_fm}({model})_{token_model_rcm}.xlsx"
+    
+    }).xlsx"
     if save: save_results_to_xlsx_append(all_results_rebuilded, output_dir, filename_RCM)
     
     return all_results_rebuilded
 
 if __name__ == '__main__':
-    # results_cm = cnn_evaluation_circle_original_cm('plv', range(1, 16), save=True)
+    # results_cm = cnn_evaluation_circle_original_cm('pcc', range(1, 16), save=True)
     
     # %%
-    model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
     model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
     results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
@@ -276,21 +275,21 @@ if __name__ == '__main__':
     results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
                                            subject_range=range(1, 16), save=True)
     
-    model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
-    model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
-    model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
-    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
     # %% End
     end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)

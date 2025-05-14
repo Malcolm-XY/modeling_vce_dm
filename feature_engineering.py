@@ -855,11 +855,6 @@ def compute_averaged_fcnetwork(feature, subjects=range(1, 16), experiments=range
             cmdata_theta = utils_feature_loading.read_fcs(dataset='seed', identifier=identifier, feature=feature,
                                                           band='theta')
 
-            # de_1=utils_feature_loading.read_cfs('seed', 'sub1ex1', 'de_LDS')['gamma']
-            # de_1 = np.mean(de_1, axis=0)
-            # de_10=utils_feature_loading.read_cfs('seed', 'sub10ex1', 'de_LDS')['gamma']
-            # de_10 = np.mean(de_10, axis=0)
-
             # 计算平均值
             cmdata_alpha_averaged = np.mean(cmdata_alpha, axis=0)
             cmdata_beta_averaged = np.mean(cmdata_beta, axis=0)
@@ -919,6 +914,74 @@ def compute_averaged_fcnetwork(feature, subjects=range(1, 16), experiments=range
 
     return global_joint_average
 
+def compute_averaged_fcnetwork_mat(feature, subjects=range(1, 16), experiments=range(1, 4), draw=True, save=False):
+    # 初始化存储结果的列表
+    cmdata_averages_dict = []
+
+    # 用于累积频段的所有数据
+    all_alpha_values = []
+    all_beta_values = []
+    all_gamma_values = []
+
+    # 遍历 subject 和 experiment
+    for subject in subjects:  # 假设 subjects 是整数
+        for experiment in experiments:  # 假设 experiments 是整数
+            identifier = f"sub{subject}ex{experiment}"
+            print(identifier)
+            
+            features = utils_feature_loading.read_fcs_mat('seed', identifier, feature)
+            cmdata_alpha = features['alpha']
+            cmdata_beta = features['beta']
+            cmdata_gamma = features['gamma']
+
+            # 计算平均值
+            cmdata_alpha_averaged = np.mean(cmdata_alpha, axis=0)
+            cmdata_beta_averaged = np.mean(cmdata_beta, axis=0)
+            cmdata_gamma_averaged = np.mean(cmdata_gamma, axis=0)
+
+            # 累积数据
+            all_alpha_values.append(cmdata_alpha_averaged)
+            all_beta_values.append(cmdata_beta_averaged)
+            all_gamma_values.append(cmdata_gamma_averaged)
+
+            # 合并同 subject 同 experiment 的数据
+            cmdata_averages_dict.append({
+                "subject": subject,
+                "experiment": experiment,
+                "averages": {
+                    "alpha": cmdata_alpha_averaged,
+                    "beta": cmdata_beta_averaged,
+                    "gamma": cmdata_gamma_averaged
+                }
+            })
+
+    # 计算整个数据集的全局平均值
+    global_alpha_average = np.mean(all_alpha_values, axis=0)
+    global_beta_average = np.mean(all_beta_values, axis=0)
+    global_gamma_average = np.mean(all_gamma_values, axis=0)
+    global_joint_average = np.mean(np.stack([global_alpha_average, global_beta_average,
+                                             global_gamma_average], axis=0), axis=0)
+
+    global_joint_average = np.mean(np.stack([global_alpha_average, global_beta_average,
+                                             global_gamma_average],  axis=0), axis=0)
+
+    fc_matrices = {'alpha': global_alpha_average,
+                   'beta': global_beta_average, 
+                   'gamma': global_gamma_average,
+                   'joint': global_joint_average
+                   }
+    
+    if draw:
+        # 输出结果
+        utils_visualization.draw_projection(global_joint_average)
+
+    if save:
+        save_results('seed', feature, 'Global_Average', fc_matrices)
+
+        print("Results saved")
+
+    return global_joint_average
+    
 # %% Label Engineering
 def generate_labels(sampling_rate=128):
     dreamer = utils_eeg_loading.read_eeg_original_dataset('dreamer')

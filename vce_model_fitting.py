@@ -46,7 +46,7 @@ def preprocessing_cm_global_averaged(cm_global_averaged, coordinates):
     
     return cm_global_averaged
 
-def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_origin', idxs_manual_remove=None):
+def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi', idxs_manual_remove=None):
     """
     Prepares smoothed channel weights, distance matrix, and global averaged connectivity matrix,
     with optional removal of specified bad channels.
@@ -71,7 +71,7 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
     
     # === 1. Target channel weight
-    channel_weights = cw_manager.read_channel_weight_LD(identifier='label_driven_mi', sort=False)['ams']
+    channel_weights = cw_manager.read_channel_weight_LD(identifier=ranking_method, sort=False)['ams']
     cw_target = prune_cw(channel_weights.to_numpy())
     # ==== 1.1 Remove specified channels
     cw_target = feature_engineering.remove_idx_manual(cw_target, idxs_manual_remove)
@@ -88,7 +88,7 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_ori
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
 
     # === 3. Connectivity matrix
-    connectivity_matrix_global_joint_averaged = vce_modeling.load_global_averages(feature=feature)
+    connectivity_matrix_global_joint_averaged = vce_modeling.load_global_averaged_mat(feature=feature)
     # === 3.1 Remove specified channels
     cm_global_averaged = feature_engineering.remove_idx_manual(connectivity_matrix_global_joint_averaged, idxs_manual_remove)
     # === 3.2 Smoothing
@@ -805,11 +805,15 @@ def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_wei
 if __name__ == '__main__':
     # Fittin target and DM
     channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
-                                                    'label_driven_mi_origin_10_15', channel_manual_remove)
+    # electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
+    #                                                 'label_driven_mi_origin_10_15', channel_manual_remove)
+    
+    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
+                                                    'label_driven_mi', channel_manual_remove)
 
     # %% Fitting
-    results, cws_fitting = fitting_model('advanced', 'linear_ratio', cw_target, distance_matrix, cm_global_averaged)
+    fm_model, rcm_model = 'basic', 'linear'
+    results, cws_fitting = fitting_model(fm_model, rcm_model, cw_target, distance_matrix, cm_global_averaged)
     
     # %% Insert target cw (LDMI) and cm cw non modeled
     cw_non_modeled = np.mean(cm_global_averaged, axis=0)
@@ -830,10 +834,10 @@ if __name__ == '__main__':
         cws_sorted[method] = cw_sorted_temp
     
     # %% Save
-    # path_currebt = os.getcwd()
-    # results_path = os.path.join(os.getcwd(), 'fitting_results')
-    # save_fitting_results(results, results_path)
-    # save_channel_weights(cws_sorted, results_path)
+    path_currebt = os.getcwd()
+    results_path = os.path.join(os.getcwd(), 'fitting_results')
+    save_fitting_results(results, results_path, f'fitting_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    save_channel_weights(cws_sorted, results_path, f'channel_weights({fm_model}_fm_{rcm_model}_rcm).xlsx')
     
     # %% Validation of Fitting Comparison
     pltlabels = {'title':'Comparison of Fitted Channel Weights across various Models',
