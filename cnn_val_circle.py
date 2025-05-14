@@ -250,11 +250,8 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     output_dir = os.path.join(os.getcwd(), 'results_cnn_evaluation')
     
     identifier = f'{model_fm.lower()}_fm_{model_rcm.lower()}_rcm'
-    filename_RCM = f"cnn_validation_RCM({identifier})_({model
+    filename_RCM = f"cnn_validation_RCM({identifier})_{model}_{feature_cm}.xlsx"
     
-    
-    
-    }).xlsx"
     if save: save_results_to_xlsx_append(all_results_rebuilded, output_dir, filename_RCM)
     
     return all_results_rebuilded
@@ -268,27 +265,27 @@ if __name__ == '__main__':
     #                                        subject_range=range(1, 16), save=True)
     
     model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
                                            subject_range=range(1, 16), save=True)
     
     model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
                                            subject_range=range(1, 16), save=True)
     
     # model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(1, 16), save=True)
     
     # model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(1, 16), save=True)
     
     # model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(1, 16), save=True)
     
     # model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(1, 16), save=True)
     
     # %% End
