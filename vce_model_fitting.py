@@ -805,11 +805,11 @@ def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_wei
 if __name__ == '__main__':
     # Fittin target and DM
     channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    # electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
-    #                                                 'label_driven_mi_origin_10_15', channel_manual_remove)
+    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
+                                                    'label_driven_mi_10_15', channel_manual_remove)
     
-    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
-                                                    'label_driven_mi', channel_manual_remove)
+    # electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
+    #                                                 'label_driven_mi', channel_manual_remove)
 
     # %% Fitting
     fm_model, rcm_model = 'basic', 'linear'

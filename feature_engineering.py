@@ -919,9 +919,7 @@ def compute_averaged_fcnetwork_mat(feature, subjects=range(1, 16), experiments=r
     cmdata_averages_dict = []
 
     # 用于累积频段的所有数据
-    all_alpha_values = []
-    all_beta_values = []
-    all_gamma_values = []
+    all_alpha_values, all_beta_values, all_gamma_values = [], [], []
 
     # 遍历 subject 和 experiment
     for subject in subjects:  # 假设 subjects 是整数

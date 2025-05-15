@@ -42,9 +42,10 @@ def compute_mean_functional_connectivity(feature, subject_range=range(1,16), exp
 if __name__ == '__main__':
     #feature_mean = compute_mean_functional_connectivity('pcc', subject_range=range(1,16), experiment_range=range(1,2))
     
-    #  feature_engineering
-    # feature_mean_ = feature_engineering.compute_averaged_fcnetwork_mat('plv', subjects=range(1, 16), 
-    #                                                                  experiments=range(1, 4), draw=True, save=False)
+    # feature_engineering
+    import feature_engineering
+    feature_mean_ = feature_engineering.compute_averaged_fcnetwork_mat('plv', subjects=range(1, 11), 
+                                                                     experiments=range(1, 4), draw=True, save=False)
     
     import vce_modeling
     feature_mean__ = vce_modeling.load_global_averaged_mat(feature='plv')
