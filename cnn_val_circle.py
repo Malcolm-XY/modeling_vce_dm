@@ -260,17 +260,17 @@ if __name__ == '__main__':
     # results_cm = cnn_evaluation_circle_original_cm('pcc', range(1, 16), save=True)
     
     # %%
-    # model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
+    # model, model_fm, model_rcm = 'exponential', 'basic', 'linear'
     # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(1, 16), save=True)
     
-    model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'gaussian', 'basic', 'linear'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
-    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'differ'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(1, 16), save=True)
+    # model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(1, 16), save=True)
     
     # model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
     # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
