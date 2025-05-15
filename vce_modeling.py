@@ -13,105 +13,6 @@ import feature_engineering
 from utils import utils_feature_loading
 from utils import utils_visualization
 
-def load_global_averages(file_path=None, feature='pcc', band='joint'):
-    """
-    读取 HDF5 文件中的 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 数据。
-
-    Args:
-        band: Select Frequency Band of EEG Data
-        file_path (str, optional): HDF5 文件的完整路径。若为 None，则根据 feature 参数构造路径。
-        feature (str, optional): 特征类型，如 'PCC'。仅当 file_path 为 None 时使用。
-
-    Returns:
-        tuple: 包含 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 的元组。
-    """
-    # 如果没有提供文件路径，则根据特征类型构造默认路径
-    feature = feature.lower()
-    if file_path is None:
-        if feature == 'pcc':
-            file_path = 'Distribution/Connectivity_Matrices_Averaged/PCC/fc_global_averages_pcc.h5'
-        elif feature == 'pcc_10_15':
-            file_path = 'Distribution/Connectivity_Matrices_Averaged/PCC/fc_global_averages_pcc_10_15.h5'
-        
-        file_path = os.path.join(os.getcwd(), file_path)
-
-    # 检查文件是否存在
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"The file '{file_path}' does not exist.")
-
-    # 读取数据
-    with h5py.File(file_path, 'r') as f:
-        global_alpha_average = f['alpha'][:]
-        global_beta_average = f['beta'][:]
-        global_gamma_average = f['gamma'][:]
-        global_delta_average = f['delta'][:]
-        global_theta_average = f['theta'][:]
-        global_joint_average = f['joint'][:]
-
-    if band == 'joint':
-        global_average = global_joint_average
-    elif band == 'beta':
-        global_average = global_beta_average
-    elif band == 'gamma':
-        global_average = global_gamma_average
-    elif band == 'alpha':
-        global_average = global_alpha_average
-    elif band == 'delta':
-        global_average = global_delta_average
-    elif band == 'theta':
-        global_average = global_theta_average
-    else: raise NotImplementedError
-
-    return global_average
-
-def load_global_averaged_mat(file_path=None, feature='pcc', band='joint'):
-    """
-    读取 HDF5 文件中的 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 数据。
-
-    Args:
-        band: Select Frequency Band of EEG Data
-        file_path (str, optional): HDF5 文件的完整路径。若为 None，则根据 feature 参数构造路径。
-        feature (str, optional): 特征类型，如 'PCC'。仅当 file_path 为 None 时使用。
-
-    Returns:
-        tuple: 包含 global_alpha_average, global_beta_average, global_gamma_average 和 global_joint_average 的元组。
-    """
-    # 如果没有提供文件路径，则根据特征类型构造默认路径
-    feature = feature.lower()
-    if file_path is None:
-        if feature == 'pcc':
-            file_path = 'cm_global_averaged/fc_global_averaged_pcc_mat.h5'
-        elif feature == 'pcc_10_15':
-            file_path = 'cm_global_averaged/fc_global_averaged_pcc_mat_10_15.h5'
-        elif feature == 'plv':
-            file_path = 'cm_global_averaged/fc_global_averaged_plv_mat.h5'
-        
-        file_path = os.path.join(os.getcwd(), file_path)
-
-    # 检查文件是否存在
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"The file '{file_path}' does not exist.")
-
-    # 读取数据
-    with h5py.File(file_path, 'r') as f:
-        global_alpha_average = f['alpha'][:]
-        global_beta_average = f['beta'][:]
-        global_gamma_average = f['gamma'][:]
-        global_joint_average = f['joint'][:]
-
-    if band == 'joint':
-        global_average = global_joint_average
-    elif band == 'beta':
-        global_average = global_beta_average
-    elif band == 'gamma':
-        global_average = global_gamma_average
-    elif band == 'alpha':
-        global_average = global_alpha_average
-
-    else: raise NotImplementedError
-
-    return global_average
-
 def compute_volume_conduction_factors_basic_model(_distance_matrix, method='exponential', params=None):
     """
     基于距离矩阵计算体积电导效应的因子矩阵。
@@ -301,13 +202,13 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, method='e
 
 if __name__ == '__main__':  
     # %% Load Connectivity Matrix
-    cm_pcc_joint = load_global_averages(feature='PCC')
+    cm_pcc_joint = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', 'mat')['joint']
     cm_pcc_joint = feature_engineering.normalize_matrix(np.array(cm_pcc_joint))
     utils_visualization.draw_projection(cm_pcc_joint)
     
-    cm_pcc_joint = load_global_averages(feature='PLV')
-    cm_pcc_joint = feature_engineering.normalize_matrix(np.array(cm_pcc_joint))
-    utils_visualization.draw_projection(cm_pcc_joint)
+    cm_plv_joint = utils_feature_loading.read_fcs_global_average('seed', 'plv', 'joint', 'mat')['joint']
+    cm_plv_joint = feature_engineering.normalize_matrix(np.array(cm_plv_joint))
+    utils_visualization.draw_projection(cm_plv_joint)
 
     # %% Distance Matrix
     _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
@@ -394,7 +295,7 @@ if __name__ == '__main__':
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
 
-    global_joint_average = load_global_averages(feature='PCC')
+    global_joint_average = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', 'mat')['joint']
     global_joint_average = feature_engineering.normalize_matrix(global_joint_average)
     utils_visualization.draw_projection(global_joint_average)
 

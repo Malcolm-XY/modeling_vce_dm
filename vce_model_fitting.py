@@ -88,7 +88,8 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi', i
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
 
     # === 3. Connectivity matrix
-    connectivity_matrix_global_joint_averaged = vce_modeling.load_global_averaged_mat(feature=feature)
+    connectivity_matrix_global_joint_averaged = utils_feature_loading.read_fcs_global_average('seed', feature, 'joint', 'mat')['joint']
+    
     # === 3.1 Remove specified channels
     cm_global_averaged = feature_engineering.remove_idx_manual(connectivity_matrix_global_joint_averaged, idxs_manual_remove)
     # === 3.2 Smoothing
@@ -810,9 +811,9 @@ if __name__ == '__main__':
     
     # electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
     #                                                 'label_driven_mi', channel_manual_remove)
-
+    
     # %% Fitting
-    fm_model, rcm_model = 'basic', 'linear'
+    fm_model, rcm_model = 'advanced', 'linear_ratio'
     results, cws_fitting = fitting_model(fm_model, rcm_model, cw_target, distance_matrix, cm_global_averaged)
     
     # %% Insert target cw (LDMI) and cm cw non modeled

@@ -66,7 +66,7 @@ def end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120):
         shutdown_with_countdown(countdown_seconds)
 
 # %% read parameters/save
-def read_params(model='exponential', model_fm='basic', model_rcm='differ', folder='fitting_results'):
+def read_params(model='exponential', model_fm='basic', model_rcm='differ', folder='fitting_results(15_15_joint_band_from_mat)'):
     identifier = f'{model_fm.lower()}_fm_{model_rcm.lower()}_rcm'
     
     path_current = os.getcwd()
@@ -198,7 +198,7 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     dm = feature_engineering.normalize_matrix(dm)
     
     # parameters for construction of FM and RCM
-    param = read_params(model, model_fm, model_rcm, folder='fitting_results')
+    param = read_params(model, model_fm, model_rcm, folder='fitting_results(15_15_joint_band_from_mat)')
     
     # data and evaluation circle
     all_results_rebuilded = []
