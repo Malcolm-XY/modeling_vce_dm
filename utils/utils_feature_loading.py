@@ -48,10 +48,11 @@ def read_fcs(dataset, identifier, feature, band='joint'):
     fcs_temp = utils_basic_reading.read_hdf5(path_file)
     return fcs_temp if band == 'joint' else fcs_temp.get(band, {})
 
-def read_fcs_global_average(dataset, feature, band='joint'):
-    dataset, feature, band = dataset.upper(), feature.lower(), band.lower()
+def read_fcs_global_average(dataset, feature, band='joint', source='mat'):
+    dataset, feature, band, source = dataset.upper(), feature.lower(), band.lower(), source.lower()
     path_parent_parent = os.path.dirname(os.path.dirname(os.getcwd()))
-    path_file = os.path.join(path_parent_parent, 'Research_Data', dataset, 'functional connectivity', f'{feature}_h5', 'global_average.h5')
+    path_file = os.path.join(path_parent_parent, 'Research_Data', dataset, 'functional connectivity', 
+                             'global_averaged_h5', f'fc_global_averaged_{feature}_{source}.h5')
     fcs_temp = utils_basic_reading.read_hdf5(path_file)
     return fcs_temp if band == 'joint' else fcs_temp.get(band, {})
 

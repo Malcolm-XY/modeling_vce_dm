@@ -908,7 +908,7 @@ def compute_averaged_fcnetwork(feature, subjects=range(1, 16), experiments=range
         utils_visualization.draw_projection(global_joint_average)
 
     if save:
-        save_results('seed', feature, 'Global_Average', fc_matrices)
+        save_results('seed', 'functional connectivity\global_averaged', f'fc_global_averaged_{feature}_h5', fc_matrices)
 
         print("Results saved")
 
@@ -919,9 +919,7 @@ def compute_averaged_fcnetwork_mat(feature, subjects=range(1, 16), experiments=r
     cmdata_averages_dict = []
 
     # 用于累积频段的所有数据
-    all_alpha_values = []
-    all_beta_values = []
-    all_gamma_values = []
+    all_alpha_values, all_beta_values, all_gamma_values = [], [], []
 
     # 遍历 subject 和 experiment
     for subject in subjects:  # 假设 subjects 是整数
@@ -976,7 +974,7 @@ def compute_averaged_fcnetwork_mat(feature, subjects=range(1, 16), experiments=r
         utils_visualization.draw_projection(global_joint_average)
 
     if save:
-        save_results('seed', feature, 'Global_Average', fc_matrices)
+        save_results('seed', 'global_averaged', f'fc_global_averaged_{feature}_mat', fc_matrices)
 
         print("Results saved")
 
