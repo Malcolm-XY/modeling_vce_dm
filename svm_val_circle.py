@@ -222,7 +222,7 @@ def example_usage_cw_fitting():
     return svm_results
 
 # %% evaluations
-def svm_eval_circle_cw_control_1(argument='data_driven_pcc_10_15', selection_rate=1, feature='pcc'):
+def svm_eval_circle_cw_control_1(argument='data_driven_pcc_10_15', selection_rate=1, feature='pcc', save=False):
     # control 1; channel weights computed by the global averaged pcc connectivity matrices from sub1-sub10
     cw_control = cw_manager.read_channel_weight_DD(argument, sort=True)
     channel_selected_control = cw_control.index[:int(len(cw_control.index)*selection_rate)]    
@@ -255,13 +255,13 @@ def svm_eval_circle_cw_control_1(argument='data_driven_pcc_10_15', selection_rat
     print(f'Average SVM Results: {avg_results}')
     
     # save to xlsx
-    identifier = argument
-    # 
-    save_to_xlsx_control(results_control, feature, identifier)
+    if save:
+        identifier = argument
+        save_to_xlsx_control(results_control, feature, identifier)
     
     return results_control, avg_results
 
-def svm_eval_circle_cw_control_2(argument='label_driven_mi_10_15', selection_rate=1, feature='pcc'):
+def svm_eval_circle_cw_control_2(argument='label_driven_mi_10_15', selection_rate=1, feature='pcc', save=False):
     # control 1; channel weights computed by the global averaged pcc connectivity matrices from sub1-sub10
     cw_control = cw_manager.read_channel_weight_LD(argument, sort=True)
     channel_selected_control = cw_control.index[:int(len(cw_control.index)*selection_rate)]    
@@ -294,15 +294,15 @@ def svm_eval_circle_cw_control_2(argument='label_driven_mi_10_15', selection_rat
     print(f'Average SVM Results: {avg_results}')
     
     # save to xlsx
-    identifier = argument
-    # 
-    save_to_xlsx_control(results_control, feature, identifier)
+    if save:
+        identifier = argument
+        save_to_xlsx_control(results_control, feature, identifier)
     
     return results_control, avg_results
 
 def svm_eval_circle_cw_fitting(model, model_fm, model_rcm, 
                                argument='fitting_results(10_15_joint_band_from_mat)', selection_rate=1, feature='pcc', 
-                               save_mark='10_15'):
+                               save_mark='10_15', save=False):
     # experiment; channel weights computed from the rebuilded connectivity matrix that constructed by vce modeling
     cw_fitting = cw_manager.read_channel_weight_fitting(model_fm, model_rcm, model, 
                                     source=argument, sort=True)
@@ -398,10 +398,12 @@ if __name__ == '__main__':
     subject_range, experiment_range = range(11, 16), range(1, 4)
     
     # %% control 1; channel weights computed by the global averaged pcc connectivity matrices from sub1-sub10
-    # results_control, avg_results_control = svm_eval_circle_cw_control_1('data_driven_pcc_10_15', selection_rate, feature)
+    # results_control, avg_results_control = svm_eval_circle_cw_control_1('data_driven_pcc_10_15', selection_rate, feature,
+    #                                                                     save=True)
     
     # %% control 2; channel weights computed due to the relevance between channel signals and experiment labels
-    # results_target, avg_results_target = svm_eval_circle_cw_control_2('label_driven_mi_10_15', selection_rate, feature)
+    # results_target, avg_results_target = svm_eval_circle_cw_control_2('label_driven_mi_10_15', selection_rate, feature,
+    #                                                                   save=False)
     
     # %% experiment; channel weights computed from the rebuilded connectivity matrix that constructed by vce modeling
     model = list(['exponential', 'gaussian', 'inverse', 'powerlaw', 'rational_quadratic', 'generalized_gaussian', 'sigmoid'])
@@ -409,4 +411,5 @@ if __name__ == '__main__':
     
     for trail in range(0, 7):
         results_fitting, avg_results_fitting = svm_eval_circle_cw_fitting(model[trail], model_fm, model_rcm, 
-                                                                          selection_rate=selection_rate, feature=feature)
+                                                                          selection_rate=selection_rate, feature=feature,
+                                                                          save=True)
