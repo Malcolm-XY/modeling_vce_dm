@@ -229,98 +229,98 @@ if __name__ == '__main__':
     # targrt = example_usage_cw_target()
     # fitting = example_usage_cw_fitting()
     
-    selection_rate, feature = 0.25, 'de_LDS'
+    selection_rate, feature = 0.5, 'de_LDS'
     subject_range, experiment_range = range(11, 16), range(1, 4)
     
     # %% control 1; channel weights computed by the global averaged pcc connectivity matrices from sub1-sub10
-    # identifier = 'data_driven_pcc_10_15'
-    # cw_control = cw_manager.read_channel_weight_DD(identifier, sort=True)
-    # channel_selected_control = cw_control.index[:int(len(cw_control.index)*selection_rate)]    
+    identifier = 'data_driven_pcc_10_15'
+    cw_control = cw_manager.read_channel_weight_DD(identifier, sort=True)
+    channel_selected_control = cw_control.index[:int(len(cw_control.index)*selection_rate)]    
     
-    # # labels
-    # y = utils_feature_loading.read_labels('seed')
+    # labels
+    y = utils_feature_loading.read_labels('seed')
     
-    # # evaluation circle
-    # results_control = []
-    # for sub in subject_range:
-    #     for ex in experiment_range:
+    # evaluation circle
+    results_control = []
+    for sub in subject_range:
+        for ex in experiment_range:
             
-    #         # features
-    #         features = utils_feature_loading.read_cfs('seed', f'sub{sub}ex{ex}', feature)
-    #         alpha = features['alpha'][:, channel_selected_control]
-    #         beta = features['beta'][:, channel_selected_control]
-    #         gamma = features['gamma'][:, channel_selected_control]
-    #         x_selected = np.hstack([alpha, beta, gamma])
+            # features
+            features = utils_feature_loading.read_cfs('seed', f'sub{sub}ex{ex}', feature)
+            alpha = features['alpha'][:, channel_selected_control]
+            beta = features['beta'][:, channel_selected_control]
+            gamma = features['gamma'][:, channel_selected_control]
+            x_selected = np.hstack([alpha, beta, gamma])
             
-    #         # svm evaluation
-    #         svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
+            # svm evaluation
+            svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
             
-    #         results_control.append(svm_results)
+            results_control.append(svm_results)
     
-    # print('Evaluation compelete\n')
+    print('Evaluation compelete\n')
     
-    # # calculate average
-    # result_keys = results_control[0].keys()
-    # avg_results = {key: np.mean([res[key] for res in results_control]) for key in result_keys}
-    # print(f'Average SVM Results: {avg_results}')
+    # calculate average
+    result_keys = results_control[0].keys()
+    avg_results = {key: np.mean([res[key] for res in results_control]) for key in result_keys}
+    print(f'Average SVM Results: {avg_results}')
     
-    # # save to xlsx
-    # df_results = pd.DataFrame(results_control)
-    # df_results.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in subject_range for j in experiment_range])
-    # df_results.loc["Average"] = ["Average"] + list(avg_results.values())
+    # save to xlsx
+    df_results = pd.DataFrame(results_control)
+    df_results.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in subject_range for j in experiment_range])
+    df_results.loc["Average"] = ["Average"] + list(avg_results.values())
     
-    # # 构造保存路径
-    # path_save = os.path.join(os.getcwd(), 'results_svm_evaluation', 
-    #                          f'svm_results_{feature}_by_{identifier}.xlsx')
+    # 构造保存路径
+    path_save = os.path.join(os.getcwd(), 'results_svm_evaluation', 
+                             f'svm_results_{feature}_by_{identifier}.xlsx')
     
-    # # 保存为 Excel 并指定 sheet 名
-    # with pd.ExcelWriter(path_save, engine='openpyxl') as writer:
-    #     df_results.to_excel(writer, sheet_name=f'selection_rate_{selection_rate}', index=False)
+    # 保存为 Excel 并指定 sheet 名
+    with pd.ExcelWriter(path_save, engine='openpyxl') as writer:
+        df_results.to_excel(writer, sheet_name=f'selection_rate_{selection_rate}', index=False)
     
     # %% control 2; channel weights computed due to the relevance between channel signals and experiment labels
-    # identifier = 'label_driven_mi_10_15'
-    # cw_target = cw_manager.read_channel_weight_LD(identifier, sort=True)
-    # channel_selected_target = cw_target.index[:int(len(cw_target.index)*selection_rate)]
+    identifier = 'label_driven_mi_10_15'
+    cw_target = cw_manager.read_channel_weight_LD(identifier, sort=True)
+    channel_selected_target = cw_target.index[:int(len(cw_target.index)*selection_rate)]
     
-    # # labels
-    # y = utils_feature_loading.read_labels('seed')
+    # labels
+    y = utils_feature_loading.read_labels('seed')
     
-    # # evaluation circle
-    # results_target = []
-    # for sub in subject_range:
-    #     for ex in experiment_range:
+    # evaluation circle
+    results_target = []
+    for sub in subject_range:
+        for ex in experiment_range:
             
-    #         # features
-    #         features = utils_feature_loading.read_cfs('seed', f'sub{sub}ex{ex}', feature)
-    #         alpha = features['alpha'][:, channel_selected_target]
-    #         beta = features['beta'][:, channel_selected_target]
-    #         gamma = features['gamma'][:, channel_selected_target]
-    #         x_selected = np.hstack([alpha, beta, gamma])
+            # features
+            features = utils_feature_loading.read_cfs('seed', f'sub{sub}ex{ex}', feature)
+            alpha = features['alpha'][:, channel_selected_target]
+            beta = features['beta'][:, channel_selected_target]
+            gamma = features['gamma'][:, channel_selected_target]
+            x_selected = np.hstack([alpha, beta, gamma])
             
-    #         # svm evaluation
-    #         svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
+            # svm evaluation
+            svm_results = k_fold_cross_validation_ml(x_selected, y, k_folds=5, model_type='svm')
             
-    #         results_target.append(svm_results)
+            results_target.append(svm_results)
     
-    # print('Evaluation compelete\n')
+    print('Evaluation compelete\n')
     
-    # # calculate average
-    # result_keys = results_target[0].keys()
-    # avg_results = {key: np.mean([res[key] for res in results_target]) for key in result_keys}
-    # print(f'Average SVM Results: {avg_results}')
+    # calculate average
+    result_keys = results_target[0].keys()
+    avg_results = {key: np.mean([res[key] for res in results_target]) for key in result_keys}
+    print(f'Average SVM Results: {avg_results}')
     
-    # # save to xlsx
-    # df_results = pd.DataFrame(results_target)
-    # df_results.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in subject_range for j in experiment_range])
-    # df_results.loc["Average"] = ["Average"] + list(avg_results.values())
+    # save to xlsx
+    df_results = pd.DataFrame(results_target)
+    df_results.insert(0, "Subject-Experiment", [f'sub{i}ex{j}' for i in subject_range for j in experiment_range])
+    df_results.loc["Average"] = ["Average"] + list(avg_results.values())
     
-    # # 构造保存路径
-    # path_save = os.path.join(os.getcwd(), 'results_svm_evaluation', 
-    #                          f'svm_results_{feature}_by_{identifier}.xlsx')
+    # 构造保存路径
+    path_save = os.path.join(os.getcwd(), 'results_svm_evaluation', 
+                             f'svm_results_{feature}_by_{identifier}.xlsx')
     
-    # # 保存为 Excel 并指定 sheet 名
-    # with pd.ExcelWriter(path_save, engine='openpyxl') as writer:
-    #     df_results.to_excel(writer, sheet_name=f'selection_rate_{selection_rate}', index=False)
+    # 保存为 Excel 并指定 sheet 名
+    with pd.ExcelWriter(path_save, engine='openpyxl') as writer:
+        df_results.to_excel(writer, sheet_name=f'selection_rate_{selection_rate}', index=False)
     
     # %% experiment; channel weights computed from the rebuilded connectivity matrix that constructed by vce modeling
     def svm_eval_cw_fitting(model, model_fm, model_rcm, argument='fitting_results(10_15_joint_band_from_mat)', mark='10_15'):
