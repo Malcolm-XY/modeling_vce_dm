@@ -260,33 +260,33 @@ if __name__ == '__main__':
     results_cm = cnn_evaluation_circle_original_cm('pcc', range(11, 16), save=True)
     
     # %%
-    model, model_fm, model_rcm = 'exponential', 'basic', 'linear'
+    model, model_fm, model_rcm = 'exponential', 'basic', 'linear_ratio'
     results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
                                            subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'gaussian', 'basic', 'linear'
+    model, model_fm, model_rcm = 'gaussian', 'basic', 'linear_ratio'
     results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
                                            subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
+    # model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear_ratio'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
+    # model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear_ratio'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
+    # model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear_ratio'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'inverse', 'basic', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
+    # model, model_fm, model_rcm = 'inverse', 'basic', 'linear_ratio'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
+    # model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear_ratio'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(11, 16), save=True)
     
     # %% End
     end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
