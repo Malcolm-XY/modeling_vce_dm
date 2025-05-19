@@ -188,7 +188,7 @@ from utils import utils_feature_loading
 from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
 
 def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm, 
-                                       subject_range=range(1, 6), experiment_range=range(1, 4), save=False):
+                                       subject_range=range(11, 16), experiment_range=range(1, 4), save=False):
     # labels
     labels = utils_feature_loading.read_labels(dataset='seed')
     y = torch.tensor(np.array(labels)).view(-1)
@@ -198,7 +198,7 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     dm = feature_engineering.normalize_matrix(dm)
     
     # parameters for construction of FM and RCM
-    param = read_params(model, model_fm, model_rcm, folder='fitting_results(15_15_joint_band_from_mat)')
+    param = read_params(model, model_fm, model_rcm, folder='fitting_results(10_15_joint_band_from_mat)')
     
     # data and evaluation circle
     all_results_rebuilded = []
