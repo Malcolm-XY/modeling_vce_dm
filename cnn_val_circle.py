@@ -297,25 +297,25 @@ if __name__ == '__main__':
     # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
-    
-    model, model_fm, model_rcm = 'powerlaw', 'advanced', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
-    
-    model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-                                           subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'inverse', 'advanced', 'linear'
+    # model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear'
     # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear'
+    # model, model_fm, model_rcm = 'powerlaw', 'advanced', 'linear'
     # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
     #                                        subject_range=range(11, 16), save=True)
+    
+    # model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear'
+    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    #                                        subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'inverse', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
     # %% linear_ratio
     # model, model_fm, model_rcm = 'exponential', 'advanced', 'linear_ratio'
