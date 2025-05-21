@@ -1455,7 +1455,9 @@ def insert_idx_manual(A, manual_idxs=[], value=0):
     return A
 
 # %% Example usage
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    filter_eeg_and_save_circle('seed', subject_range=range(1,16), experiment_range=range(1,4), verbose=True, save=True)
+    
     # %% Filter EEG
     # eeg = utils_eeg_loading.read_eeg_originaldataset('seed', 'sub1ex1')
     # filtered_eeg_seed_sample = filter_eeg_seed('sub1ex1')
