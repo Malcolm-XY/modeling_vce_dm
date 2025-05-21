@@ -43,7 +43,7 @@ def filter_eeg(eeg, freq=128, verbose=False):
         "Theta": (4, 8),
         "Alpha": (8, 13),
         "Beta": (13, 30),
-        "Gamma": (30, 63),
+        "Gamma": (30, 50),
     }
     
     band_filtered_eeg = {}
@@ -140,8 +140,9 @@ def filter_eeg_and_save_circle(dataset, subject_range, experiment_range=None, ve
     if dataset == 'SEED' and subject_range is not None and experiment_range is not None:
         for subject in subject_range:
             for experiment in experiment_range:
-                print(f"Processing Subject: {subject}, Experiment: {experiment}.")
-                filter_eeg_seed(subject, verbose=verbose, save=save)
+                identifier = f'sub{subject}ex{experiment}'
+                print(f"Processing: {identifier}.")
+                filter_eeg_seed(identifier, verbose=verbose, save=save)
     elif dataset == 'DREAMER' and subject_range is not None and experiment_range is None:
         for subject in subject_range:
             print(f"Processing Subject: {subject}.")
@@ -1454,10 +1455,12 @@ def insert_idx_manual(A, manual_idxs=[], value=0):
     return A
 
 # %% Example usage
-if __name__ == "__main__":
+if __name__ == "__main__":    
     # %% Filter EEG
     # eeg = utils_eeg_loading.read_eeg_originaldataset('seed', 'sub1ex1')
     # filtered_eeg_seed_sample = filter_eeg_seed('sub1ex1')
+    
+    # filter_eeg_and_save_circle('seed', range(1,2), range(1,4), save=False)
     
     # eeg = utils_eeg_loading.read_eeg_originaldataset('dreamer', 'sub1')
     # filtered_eeg_seed_sample = filter_eeg_dreamer('sub1')    
@@ -1471,7 +1474,7 @@ if __name__ == "__main__":
     
     # %% Feature Engineering; Compute functional connectivities
     # eeg_sample_seed = utils_eeg_loading.read_and_parse_seed('sub1ex1')
-    # pcc_sample_seed = compute_corr_matrices(eeg_sample_seed, samplingrate=200)
+    # pcc_sample_seed = compute_corr_matrices(eeg_sample_seed, sampling_rate=200)
     # plv_sample_seed = compute_plv_matrices(eeg_sample_seed, samplingrate=200)
     # # mi_sample_seed = compute_mi_matrices(eeg_sample_seed, samplingrate=200)
     
@@ -1488,7 +1491,7 @@ if __name__ == "__main__":
     # %% Interpolation
     
     # %% Feature Engineering; Computation circles
-    # fc_pcc_matrices_seed = fc_matrices_circle('SEED', feature='pcc', save=False, subject_range=range(1, 16), experiment_range=range(1, 4))
+    fc_pcc_matrices_seed = fc_matrices_circle('SEED', feature='pcc', save=True, subject_range=range(1, 16), experiment_range=range(1, 4))
     # fc_plv_matrices_seed = fc_matrices_circle('SEED', feature='plv', save=False, subject_range=range(1, 2), experiment_range=range(1, 2))
     # fc_mi_matrices_seed = fc_matrices_circle('SEED', feature='mi', save=False, subject_range=range(1, 2), experiment_range=range(1, 2))
 
@@ -1497,7 +1500,7 @@ if __name__ == "__main__":
     # fc_mi_matrices_dreamer = fc_matrices_circle('dreamer', feature='mi', save=True, subject_range=range(1, 2))
     
     # %% Feature Engineering; Compute Average CM
-    global_joint_average = compute_averaged_fcnetwork(feature='pcc', subjects=range(1, 11), experiments=range(1, 4), save=True)
+    # global_joint_average = compute_averaged_fcnetwork(feature='pcc', subjects=range(1, 11), experiments=range(1, 4), save=True)
     
     # %% End program actions
     # utils.end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
