@@ -394,16 +394,17 @@ def save_to_xlsx_fitting(results, feature, identifier, model):
 
 # %%
 if __name__ == '__main__':
-    selection_rate, feature = 0.4, 'de_LDS'
+    # %%
+    selection_rate, feature = 0.4, 'psd_LDS'
     subject_range, experiment_range = range(11, 16), range(1, 4)
     
     # %% control 1; channel weights computed by the global averaged pcc connectivity matrices from sub1-sub10
-    # results_control, avg_results_control = svm_eval_circle_cw_control_1('data_driven_pcc_10_15', selection_rate, feature,
-      #                                                                save=True)
+    results_control, avg_results_control = svm_eval_circle_cw_control_1('data_driven_pcc_10_15', selection_rate, feature,
+                                                                       save=True)
     
     # %% control 2; channel weights computed due to the relevance between channel signals and experiment labels
-    # results_target, avg_results_target = svm_eval_circle_cw_control_2('label_driven_mi_10_15', selection_rate, feature,
-      #                                                                save=True)
+    results_target, avg_results_target = svm_eval_circle_cw_control_2('label_driven_mi_10_15', selection_rate, feature,
+                                                                       save=True)
     
     # %% experiment; channel weights computed from the rebuilded connectivity matrix that constructed by vce modeling
     model = list(['exponential', 'gaussian', 'inverse', 'powerlaw', 'rational_quadratic', 'generalized_gaussian', 'sigmoid'])
@@ -419,3 +420,4 @@ if __name__ == '__main__':
         
     avgs_results_fitting = np.vstack(avgs_results_fitting)
     avgs_results_fitting_df = pd.DataFrame(avgs_results_fitting)
+    
