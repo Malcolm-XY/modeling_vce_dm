@@ -153,16 +153,16 @@ def cnn_evaluation_circle_original_cm(feature_cm, subject_range=range(1, 6), exp
             print(f"Evaluating {subject_id}...")
             
             # CM/MAT
-            # features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
-            # alpha = features['alpha']
-            # beta = features['beta']
-            # gamma = features['gamma']
-            
-            # CM/H5
-            features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
             alpha = features['alpha']
             beta = features['beta']
             gamma = features['gamma']
+            
+            # CM/H5
+            # features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            # alpha = features['alpha']
+            # beta = features['beta']
+            # gamma = features['gamma']
             
             x = np.stack((alpha, beta, gamma), axis=1)
             
@@ -210,16 +210,16 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
             print(f"Evaluating {subject_id}...")
             
             # CM/MAT
-            # features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
-            # alpha = features['alpha']
-            # beta = features['beta']
-            # gamma = features['gamma']
-
-            # CM/H5
-            features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
             alpha = features['alpha']
             beta = features['beta']
             gamma = features['gamma']
+
+            # CM/H5
+            # features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            # alpha = features['alpha']
+            # beta = features['beta']
+            # gamma = features['gamma']
 
             # RCM
             alpha_rebuilded = cm_rebuild(alpha, dm, param, model, model_fm, model_rcm, True, False)
@@ -257,94 +257,181 @@ def cnn_evaluation_circle_rebuilded_cm(feature_cm, model, model_fm, model_rcm,
     return all_results_rebuilded
     
 if __name__ == '__main__':
-    results_cm = cnn_evaluation_circle_original_cm('pcc', range(11, 16), save=True)
-
+    results_cm = cnn_evaluation_circle_original_cm('plv', range(11, 16), save=True)
+    
     # %% differ
-    # model, model_fm, model_rcm = 'exponential', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'gaussian', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'powerlaw', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'sigmoid', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'inverse', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'differ'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # %% linear
-    # model, model_fm, model_rcm = 'exponential', 'advanced', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'gaussian', 'advanced', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'powerlaw', 'advanced', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    # model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
-    
-    model, model_fm, model_rcm = 'inverse', 'advanced', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    model, model_fm, model_rcm = 'exponential', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
                                            subject_range=range(11, 16), save=True)
     
-    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear'
-    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+    model, model_fm, model_rcm = 'gaussian', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'powerlaw', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'sigmoid', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'inverse', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    # %% linear
+    model, model_fm, model_rcm = 'exponential', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'gaussian', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'inverse', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
                                            subject_range=range(11, 16), save=True)
     
     # %% linear_ratio
-    # model, model_fm, model_rcm = 'exponential', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'exponential', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'gaussian', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'gaussian', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'generalized_gaussian', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'powerlaw', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'powerlaw', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'sigmoid', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'inverse', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'inverse', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
-    # model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear_ratio'
-    # results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
-    #                                        subject_range=range(11, 16), save=True)
+    model, model_fm, model_rcm = 'rational_quadratic', 'basic', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    # %% differ
+    model, model_fm, model_rcm = 'exponential', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'gaussian', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'powerlaw', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'sigmoid', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'inverse', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'differ'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    # %% linear
+    model, model_fm, model_rcm = 'exponential', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'gaussian', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'powerlaw', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'inverse', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    # %% linear_ratio
+    model, model_fm, model_rcm = 'exponential', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'gaussian', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'generalized_gaussian', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'powerlaw', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'sigmoid', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'inverse', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('plv', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
+    
+    model, model_fm, model_rcm = 'rational_quadratic', 'advanced', 'linear_ratio'
+    results_rcm = cnn_evaluation_circle_rebuilded_cm('pcc', model, model_fm, model_rcm, 
+                                           subject_range=range(11, 16), save=True)
     
     # %% End
-    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
