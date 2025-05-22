@@ -57,3 +57,20 @@ def cnn_evaluation_circle_original_cm(feature_cm, subject_range=range(1, 6), exp
     if save: save_results_to_xlsx_append(all_results_original, output_dir, filename_CM)
     
     return all_results_original
+
+
+
+selection_rate = 0.5
+cw_control_1 = cw_manager.read_channel_weight_DD('data_driven_pcc_10_15', sort=True)
+cw_control_2 = cw_manager.read_channel_weight_LD('label_driven_mi_10_15', sort=True)
+
+channel_selected_control_1 = cw_control_1.index[:int(len(cw_control_1.index)*selection_rate)]
+channel_selected_control_2 = cw_control_2.index[:int(len(cw_control_2.index)*selection_rate)]
+
+features_example = utils_feature_loading.read_fcs('seed', 'sub1ex1', 'pcc')
+alpha_example = features_example['alpha']
+beta_example = features_example['beta']
+gamma_example = features_example['gamma']
+
+alpha_example_ = alpha_example[:,channel_selected_control_1,:]
+alpha_example__ = alpha_example_[:,:,channel_selected_control_1]
