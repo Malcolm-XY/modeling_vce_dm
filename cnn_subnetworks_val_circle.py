@@ -219,18 +219,13 @@ def cnn_subnetworks_evaluation_circle_rebuilt_cm(model, model_fm, model_rcm,
 def cnn_subnetworks_eval_circle_rcm_intergrated(model_fm, model_rcm, selection_rate, feature_cm, save=False):
     model = list(['exponential', 'gaussian', 'inverse', 'powerlaw', 'rational_quadratic', 'generalized_gaussian', 'sigmoid'])
     
-    avgs_results_fitting = []
+    results_fitting = {}
     for trail in range(0, 7):
-        results_fitting, avg_results_fitting = cnn_subnetworks_evaluation_circle_rebuilt_cm(model[trail], model_fm, model_rcm, 
+        results_fitting[model[trail]] = cnn_subnetworks_evaluation_circle_rebuilt_cm(model[trail], model_fm, model_rcm, 
                                                                           selection_rate=selection_rate, feature_cm=feature_cm,
                                                                           save=save) # save=True)
-        avg_results_fitting = np.array([model[trail], avg_results_fitting['accuracy']])
-        avgs_results_fitting.append(avg_results_fitting)
-        
-    avgs_results_fitting = np.vstack(avgs_results_fitting)
-    avgs_results_fitting_df = pd.DataFrame(avgs_results_fitting)
     
-    return avgs_results_fitting, avgs_results_fitting_df
+    return results_fitting
 
 # %% read parameters/save
 def read_params(model='exponential', model_fm='basic', model_rcm='differ', folder='fitting_results(15_15_joint_band_from_mat)'):
@@ -289,8 +284,10 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 if __name__ == '__main__':
     # results_1 = cnn_subnetworks_evaluation_circle_control_1(selection_rate=0.25, feature_cm='pcc', save=True)
     # results_2 = cnn_subnetworks_evaluation_circle_control_2(selection_rate=0.25, feature_cm='pcc', save=True)
-    results_3 = cnn_subnetworks_evaluation_circle_rebuilt_cm(model='exponential', model_fm='advanced', model_rcm='linear', 
-                                                     argument='fitting_results(10_15_joint_band_from_mat)', 
-                                                     selection_rate=0.25, feature_cm='pcc', 
-                                                     subject_range=range(11,16), experiment_range=range(1,4), 
-                                                     save=True)
+    # results_3 = cnn_subnetworks_evaluation_circle_rebuilt_cm(model='exponential', model_fm='advanced', model_rcm='linear', 
+    #                                                  argument='fitting_results(10_15_joint_band_from_mat)', 
+    #                                                  selection_rate=0.25, feature_cm='pcc', 
+    #                                                  subject_range=range(11,16), experiment_range=range(1,4), 
+    #                                                  save=True)
+    
+    cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', 0.25, 'pcc', save=True)
