@@ -259,7 +259,10 @@ def svm_eval_circle_cw_control_1(argument='data_driven_pcc_10_15', selection_rat
     # save to xlsx
     if save:
         identifier = argument
-        save_to_xlsx_control(results_control, feature, identifier, subject_range, experiment_range, selection_rate)
+        save_to_xlsx_control(results_control, feature, identifier, subject_range, experiment_range,
+                             folder_name='results_svm_evaluation',
+                             file_name=f'svm_validation_{feature}_by_{identifier}.xlsx',
+                             sheet_name=f'selection_rate_{selection_rate}')
     
     return results_control, avg_results
 
@@ -300,7 +303,10 @@ def svm_eval_circle_cw_control_2(argument='label_driven_mi_10_15', selection_rat
     # save to xlsx
     if save:
         identifier = argument
-        save_to_xlsx_control(results_control, feature, identifier, subject_range, experiment_range, selection_rate)
+        save_to_xlsx_control(results_control, feature, identifier, subject_range, experiment_range,
+                             folder_name='results_svm_evaluation',
+                             file_name=f'svm_validation_{feature}_by_{identifier}.xlsx',
+                             sheet_name=f'selection_rate_{selection_rate}')
     
     return results_control, avg_results
 
@@ -342,7 +348,10 @@ def svm_eval_circle_cw_fitting(model, model_fm, model_rcm,
 
     # save to xlsx
     identifier = f'{model_fm}_{model_rcm}_{save_mark}'
-    save_to_xlsx_fitting(results_fitting, feature, identifier, model, subject_range, experiment_range, selection_rate)
+    save_to_xlsx_fitting(results_fitting, subject_range, experiment_range,
+                         folder_name='results_svm_evaluation',
+                         file_name=f'svm_validation_{feature}_by_{identifier}.xlsx',
+                         sheet_name=f'{model}_sr_{selection_rate}')
             
     return results_fitting, avg_results
 
@@ -363,7 +372,7 @@ def svm_eval_circle_cw_fitting_intergrated(model_fm, model_rcm, selection_rate, 
     return avgs_results_fitting, avgs_results_fitting_df
 
 # %% save
-def save_to_xlsx_control(results, feature, identifier, subject_range, experiment_range, selection_rate):
+def save_to_xlsx_control(results, subject_range, experiment_range, folder_name, file_name, sheet_name):
     # calculate average
     result_keys = results[0].keys()
     avg_results = {key: np.mean([res[key] for res in results]) for key in result_keys}
@@ -375,20 +384,19 @@ def save_to_xlsx_control(results, feature, identifier, subject_range, experiment
     df_results.loc["Average"] = ["Average"] + list(avg_results.values())
     
     # 构造保存路径
-    path_save = os.path.join(os.getcwd(), 'results_svm_evaluation', 
-                             f'svm_results_{feature}_by_{identifier}.xlsx')
+    path_save = os.path.join(os.getcwd(), folder_name, file_name)
     
     # 判断文件是否存在
     if os.path.exists(path_save):
         # 追加模式，保留已有 sheet，添加新 sheet
         with pd.ExcelWriter(path_save, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            df_results.to_excel(writer, sheet_name=f'selection_rate_{selection_rate}', index=False)
+            df_results.to_excel(writer, sheet_name=sheet_name, index=False)
     else:
         # 新建文件
         with pd.ExcelWriter(path_save, engine='openpyxl') as writer:
-            df_results.to_excel(writer, sheet_name=f'selection_rate_{selection_rate}', index=False)
-
-def save_to_xlsx_fitting(results, feature, identifier, model, subject_range, experiment_range, selection_rate):
+            df_results.to_excel(writer, sheet_name=sheet_name, index=False)
+    
+def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, file_name, sheet_name):
     # calculate average
     result_keys = results[0].keys()
     avg_results = {key: np.mean([res[key] for res in results]) for key in result_keys}
@@ -400,18 +408,17 @@ def save_to_xlsx_fitting(results, feature, identifier, model, subject_range, exp
     df_results.loc["Average"] = ["Average"] + list(avg_results.values())
     
     # 构造保存路径
-    path_save = os.path.join(os.getcwd(), 'results_svm_evaluation', 
-                             f'svm_results_{feature}_by_{identifier}.xlsx')
+    path_save = os.path.join(os.getcwd(), folder_name, file_name)
     
     # 判断文件是否存在
     if os.path.exists(path_save):
         # 追加模式，保留已有 sheet，添加新 sheet
         with pd.ExcelWriter(path_save, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            df_results.to_excel(writer, sheet_name=f'{model}_sr_{selection_rate}', index=False)
+            df_results.to_excel(writer, sheet_name=sheet_name, index=False)
     else:
         # 新建文件
         with pd.ExcelWriter(path_save, engine='openpyxl') as writer:
-            df_results.to_excel(writer, sheet_name=f'{model}_sr_{selection_rate}', index=False)
+            df_results.to_excel(writer, sheet_name=sheet_name, index=False)
 
 # %%
 if __name__ == '__main__':
