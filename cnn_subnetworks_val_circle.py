@@ -215,7 +215,7 @@ def cnn_subnetworks_eval_circle_rcm_intergrated(model_fm, model_rcm, selection_r
 
 if __name__ == '__main__':
     cnn_subnetworks_evaluation_circle_control_1(selection_rate=0.25, feature_cm='pcc', save=True)
-    cnn_subnetworks_evaluation_circle_control_1(selection_rate=0.25, feature_cm='pcc', save=True)
+    cnn_subnetworks_evaluation_circle_control_2(selection_rate=0.25, feature_cm='pcc', save=True)
     cnn_subnetworks_evaluation_circle_rebuilt_cm(model='exponential', model_fm='advanced', model_rcm='linear', 
                                                      argument='fitting_results(10_15_joint_band_from_mat)', 
                                                      selection_rate=0.25, feature_cm='pcc', 
