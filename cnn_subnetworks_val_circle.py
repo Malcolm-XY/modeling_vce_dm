@@ -282,12 +282,6 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 
 # %% Execute
 if __name__ == '__main__':
-    # results_1 = cnn_subnetworks_evaluation_circle_control_1(selection_rate=0.25, feature_cm='pcc', save=True)
-    # results_2 = cnn_subnetworks_evaluation_circle_control_2(selection_rate=0.25, feature_cm='pcc', save=True)
-    # results_3 = cnn_subnetworks_evaluation_circle_rebuilt_cm(model='exponential', model_fm='advanced', model_rcm='linear', 
-    #                                                  argument='fitting_results(10_15_joint_band_from_mat)', 
-    #                                                  selection_rate=0.25, feature_cm='pcc', 
-    #                                                  subject_range=range(11,16), experiment_range=range(1,4), 
-    #                                                  save=True)
-    
-    cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', 0.25, 'pcc', save=True)
+    cnn_subnetworks_evaluation_circle_control_1(selection_rate=0.75, feature_cm='pcc', save=True)
+    cnn_subnetworks_evaluation_circle_control_2(selection_rate=0.75, feature_cm='pcc', save=True)
+    cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', 0.75, 'pcc', save=True)
