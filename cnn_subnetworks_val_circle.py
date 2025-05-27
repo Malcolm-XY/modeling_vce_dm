@@ -282,6 +282,13 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 
 # %% Execute
 if __name__ == '__main__':
-    cnn_subnetworks_evaluation_circle_control_1(selection_rate=0.75, feature_cm='pcc', save=True)
-    cnn_subnetworks_evaluation_circle_control_2(selection_rate=0.75, feature_cm='pcc', save=True)
-    cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', 0.75, 'pcc', save=True)
+    selection_rate_list = [0.75, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
+    
+    for selection_rate in selection_rate_list:
+        cnn_subnetworks_evaluation_circle_control_1(selection_rate, feature_cm='pcc', save=True)
+        cnn_subnetworks_evaluation_circle_control_2(selection_rate, feature_cm='pcc', save=True)
+        cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', selection_rate, 'pcc', save=True)
+        cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear_ratio', selection_rate, 'pcc', save=True)
+        cnn_subnetworks_eval_circle_rcm_intergrated('basic', 'linear', selection_rate, 'pcc', save=True)
+        cnn_subnetworks_eval_circle_rcm_intergrated('basic', 'linear_ratio', selection_rate, 'pcc', save=True)
+    
