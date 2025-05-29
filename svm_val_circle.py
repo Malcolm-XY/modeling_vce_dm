@@ -259,7 +259,7 @@ def svm_eval_circle_cw_control_1(argument='data_driven_pcc_10_15', selection_rat
     # save to xlsx
     if save:
         identifier = argument
-        save_to_xlsx_control(results_control, feature, identifier, subject_range, experiment_range,
+        save_to_xlsx_control(results_control, subject_range, experiment_range,
                              folder_name='results_svm_evaluation',
                              file_name=f'svm_validation_{feature}_by_{identifier}.xlsx',
                              sheet_name=f'selection_rate_{selection_rate}')
@@ -303,7 +303,7 @@ def svm_eval_circle_cw_control_2(argument='label_driven_mi_10_15', selection_rat
     # save to xlsx
     if save:
         identifier = argument
-        save_to_xlsx_control(results_control, feature, identifier, subject_range, experiment_range,
+        save_to_xlsx_control(results_control, subject_range, experiment_range,
                              folder_name='results_svm_evaluation',
                              file_name=f'svm_validation_{feature}_by_{identifier}.xlsx',
                              sheet_name=f'selection_rate_{selection_rate}')
@@ -423,27 +423,28 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 # %%
 if __name__ == '__main__':
     # %% control 1; channel weights computed by the global averaged pcc connectivity matrices from sub1-sub10
-    # results_control, avg_results_control = svm_eval_circle_cw_control_1('data_driven_pcc_10_15', selection_rate=0.5, feature='psd_LDS',
-    #                                                                     subject_range=range(11, 16), experiment_range=range(1, 4),
-    #                                                                     save=True)
+    results_control, avg_results_control = svm_eval_circle_cw_control_1('data_driven_pcc_10_15', selection_rate=0.1, feature='psd_LDS',
+                                                                        subject_range=range(11, 16), experiment_range=range(1, 4),
+                                                                        save=True)
     
     # %% control 2; channel weights computed due to the relevance between channel signals and experiment labels
-    # results_target, avg_results_target = svm_eval_circle_cw_control_2('label_driven_mi_10_15', selection_rate=0.5, feature='psd_LDS',
-    #                                                                   subject_range=range(11, 16), experiment_range=range(1, 4),
-    #                                                                   save=True)
+    results_target, avg_results_target = svm_eval_circle_cw_control_2('label_driven_mi_10_15', selection_rate=0.1, feature='psd_LDS',
+                                                                      subject_range=range(11, 16), experiment_range=range(1, 4),
+                                                                      save=True)
     
     # %% experiment; channel weights computed from the rebuilded connectivity matrix that constructed by vce modeling
-    selection_rate_list = [0.75, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
+    # selection_rate_list = [0.75, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
+    selection_rate_list = [0.1]
     
+    # for rate in selection_rate_list:
+    #     svm_eval_circle_cw_fitting_intergrated(model_fm='basic', model_rcm='differ', 
+    #                                            selection_rate=rate, feature='psd_LDS', 
+    #                                            save=True)
+    # for rate in selection_rate_list:
+    #     svm_eval_circle_cw_fitting_intergrated(model_fm='basic', model_rcm='linear', 
+    #                                            selection_rate=rate, feature='psd_LDS', 
+    #                                            save=True)
     for rate in selection_rate_list:
-        svm_eval_circle_cw_fitting_intergrated(model_fm='basic', model_rcm='differ', 
-                                               selection_rate=rate, feature='psd_LDS', 
-                                               save=True)
-    for rate in selection_rate_list:
-        svm_eval_circle_cw_fitting_intergrated(model_fm='basic', model_rcm='linear', 
-                                               selection_rate=rate, feature='psd_LDS', 
-                                               save=True)
-    for rate in selection_rate_list:
-        svm_eval_circle_cw_fitting_intergrated(model_fm='basic', model_rcm='linear_ratio', 
+        svm_eval_circle_cw_fitting_intergrated(model_fm='advanced', model_rcm='linear_ratio', 
                                                selection_rate=rate, feature='psd_LDS', 
                                                save=True)

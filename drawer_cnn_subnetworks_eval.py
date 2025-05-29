@@ -10,7 +10,10 @@ import pandas as pd
 
 # Load the Excel file
 path_current = os.getcwd()
-file_path = os.path.join(path_current, 'results_cnn_subnetworks_evaluation', 'cnn_validation_SubRCM_pcc_by_advanced_fm_linear_ratio_rcm.xlsx')
+# file_path = os.path.join(path_current, 'results_cnn_subnetworks_evaluation', 'cnn_validation_SubRCM_pcc_by_advanced_fm_linear_ratio_rcm.xlsx')
+file_path = os.path.join(path_current, 'results_svm_evaluation', 
+                         'de_LDS_10_15_evaluation', 
+                         'svm_validation_de_LDS_by_advanced_linear_ratio_10_15.xlsx')
 excel_file = pd.ExcelFile(file_path)
 
 # Prepare a summary DataFrame
