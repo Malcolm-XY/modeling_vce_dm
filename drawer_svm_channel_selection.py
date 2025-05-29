@@ -178,6 +178,26 @@ def plot_polyline():
     plot_selection_rate_vs_accuracy(title, data_powerlaw,
         colors=['slategrey', 'steelblue', 'indianred', 'red', 'sandybrown', 'darkorange'])
 
+    # %% argument: Performance of GENERALIZED GAUSSIAN decay models
+    title = "Selection Rate vs Performance of Channel Weights: GENERALIZED GAUSSIAN Decay Model"
+    data_powerlaw = {
+        "Functional Node Strength of CM: PCC": 
+            [82.7303638728132, 83.73450174, 81.43075055, 75.76393106, 76.69030009, 75.76393106, 76.16170843, 70.955089, 66.34250585],
+        "Task-Relevant Channel Importance: MI": 
+            [82.7303638728132, 82.29386644, 81.43674253, 80.80022607, 80.43970969, 80.80022607, 81.08382137, 79.61681329, 76.99489327],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Basic FM x Linear RCM": 
+            [82.73036387, 80.23053833, 80.66060548, 78.66971744, 76.63437688, 74.78972425, 74.95384331, 73.10874662, 72.09827075],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Basic FM x Linear-Ratio RCM": 
+            [82.73036387, 82.40949028, 78.8473372, 79.63100604, 79.81423138, 77.83501011, 76.35364204, 74.85842726, 75.05312906],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Advanced FM x Linear RCM": 
+            [82.73036387, 80.23053833, 80.66060548, 78.66971744, 76.63437688, 74.78972425, 73.42196732, 72.89722806, 72.09827075],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Advanced FM x Linear-Ratio RCM": 
+            [82.73036387, 83.4790324, 82.34618523, 81.45928598, 79.40489681, 79.448392, 79.43936655, 78.75316107, 73.90597381]
+    }
+    
+    plot_selection_rate_vs_accuracy(title, data_powerlaw,
+        colors=['slategrey', 'steelblue', 'indianred', 'red', 'sandybrown', 'darkorange'])
+
 def plot_bar_chart():
     # %% argument: Averaged Performance across Decay Models
     title = "Selection Rate vs Performance of Channel Weights: Averaged Performance across Decay Models"
@@ -255,6 +275,26 @@ def plot_bar_chart():
             [82.73036387, 81.70491094, 81.38787821, 79.61666335, 76.63437688, 74.78972425, 76.61047241, 74.31375704, 72.09827075],
         "Functional Node Strength of RCM: EXPONENTIAL Decay x Advanced FM x Linear-Ratio RCM": 
             [82.73036387, 83.83048873, 81.84078294, 80.11859387, 78.81349031, 77.92799246, 78.33333622, 77.84397789, 70.21950017]
+    }
+    
+    plot_selection_rate_vs_accuracy_bar(title, data_powerlaw,
+        colors=['slategrey', 'steelblue', 'indianred', 'red', 'sandybrown', 'darkorange'])
+
+    # %% argument: Performance of GENERALIZED GAUSSIAN decay models
+    title = "Selection Rate vs Performance of Channel Weights: GENERALIZED GAUSSIAN Decay Model"
+    data_powerlaw = {
+        "Functional Node Strength of CM: PCC": 
+            [82.7303638728132, 83.73450174, 81.43075055, 75.76393106, 76.69030009, 75.76393106, 76.16170843, 70.955089, 66.34250585],
+        "Task-Relevant Channel Importance: MI": 
+            [82.7303638728132, 82.29386644, 81.43674253, 80.80022607, 80.43970969, 80.80022607, 81.08382137, 79.61681329, 76.99489327],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Basic FM x Linear RCM": 
+            [82.73036387, 80.23053833, 80.66060548, 78.66971744, 76.63437688, 74.78972425, 74.95384331, 73.10874662, 72.09827075],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Basic FM x Linear-Ratio RCM": 
+            [82.73036387, 82.40949028, 78.8473372, 79.63100604, 79.81423138, 77.83501011, 76.35364204, 74.85842726, 75.05312906],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Advanced FM x Linear RCM": 
+            [82.73036387, 80.23053833, 80.66060548, 78.66971744, 76.63437688, 74.78972425, 73.42196732, 72.89722806, 72.09827075],
+        "Functional Node Strength of RCM: GENERALIZED GAUSSIAN Decay x Advanced FM x Linear-Ratio RCM": 
+            [82.73036387, 83.4790324, 82.34618523, 81.45928598, 79.40489681, 79.448392, 79.43936655, 78.75316107, 73.90597381]
     }
     
     plot_selection_rate_vs_accuracy_bar(title, data_powerlaw,
