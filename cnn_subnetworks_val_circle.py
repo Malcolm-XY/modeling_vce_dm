@@ -283,17 +283,16 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 
 # %% Execute
 if __name__ == '__main__':
-    # selection_rate_list = [1, 0.75, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1]
-    selection_rate_list = [0.2, 0.15, 0.1]
+    selection_rate_list = [1, 0.75, 0.5, 0.4, 0.3, 0.25]
     
     for selection_rate in selection_rate_list:
         cnn_subnetworks_evaluation_circle_control_1(argument='data_driven_plv_10_15', selection_rate=selection_rate, feature_cm='plv', save=True)
-        cnn_subnetworks_evaluation_circle_control_2(selection_rate=selection_rate, feature_cm='plv', save=True)
-        cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', selection_rate, 'plv', save=True)
-        cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear_ratio', selection_rate, 'plv', save=True)
-        cnn_subnetworks_eval_circle_rcm_intergrated('basic', 'linear', selection_rate, 'plv', save=True)
-        cnn_subnetworks_eval_circle_rcm_intergrated('basic', 'linear_ratio', selection_rate, 'plv', save=True)
+        # cnn_subnetworks_evaluation_circle_control_2(selection_rate=selection_rate, feature_cm='plv', save=True)
+        # cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear', selection_rate, 'plv', save=True)
+        # cnn_subnetworks_eval_circle_rcm_intergrated('advanced', 'linear_ratio', selection_rate, 'plv', save=True)
+        # cnn_subnetworks_eval_circle_rcm_intergrated('basic', 'linear', selection_rate, 'plv', save=True)
+        # cnn_subnetworks_eval_circle_rcm_intergrated('basic', 'linear_ratio', selection_rate, 'plv', save=True)
     
     # %% End
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
