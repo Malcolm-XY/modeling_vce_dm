@@ -54,6 +54,7 @@ def plot_selection_rate_vs_accuracy_bar(
     data: dict,
     selection_rate: list = [1, 0.75, 0.5, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1],
     colors: list = None,
+    ymin=60,
     ylim=90
 ):
     """
@@ -93,7 +94,7 @@ def plot_selection_rate_vs_accuracy_bar(
     plt.xticks(ticks=x, labels=[str(r) for r in selection_rate])
     plt.xlabel("Selection Rate", fontsize=12)
     plt.ylabel("Average Accuracy (%)", fontsize=12)
-    plt.ylim(60, ylim)
+    plt.ylim(ymin, ylim)
     plt.title(title, fontsize=14)
     plt.legend(loc='lower left', fontsize=10)
     plt.grid(axis='y', linestyle='--', alpha=0.6)
@@ -226,11 +227,33 @@ def polyline_drawer(evaluation='cnn_subnetwork', feature='pcc'):
     plot_selection_rate_vs_accuracy(tuples['generalized_gaussian'][0], tuples['generalized_gaussian'][1], colors=colors)
     plot_selection_rate_vs_accuracy(tuples['powerlaw'][0], tuples['powerlaw'][1], colors=colors)
 
+def barchart_drawer(evaluation='cnn_subnetwork', feature='pcc', ymin=60, ylim=90):
+    _, data_average, data_minimumMSE, data_exponential, data_generalized_gaussian, data_powerlaw = load_summary(evaluation, feature)
+    
+    colors=['slategrey', 'steelblue', 'indianred', 'red', 'sandybrown', 'darkorange']
+    
+    tuples = {
+        'average': ("Selection Rate vs Performance of Channel Weights: Averaged Performance across Decay Models", data_average),
+        'minimumMSE': ("Selection Rate vs Performance of Channel Weights: Decay Models with Minimum MSE", data_minimumMSE),
+        'exponential': ("Selection Rate vs Performance of Channel Weights: EXPONENTIAL Decay Model", data_exponential),
+        'generalized_gaussian': ("Selection Rate vs Performance of Channel Weights: GENERALIZED GAUSSIAN Decay Model", data_generalized_gaussian),
+        'powerlaw': ("Selection Rate vs Performance of Channel Weights: POWERLAW Decay Model", data_powerlaw)
+        }
+    
+    plot_selection_rate_vs_accuracy_bar(tuples['average'][0], tuples['average'][1], colors=colors, ymin=ymin, ylim=ylim)
+    plot_selection_rate_vs_accuracy_bar(tuples['minimumMSE'][0], tuples['minimumMSE'][1], colors=colors, ymin=ymin, ylim=ylim)
+    plot_selection_rate_vs_accuracy_bar(tuples['exponential'][0], tuples['exponential'][1], colors=colors, ymin=ymin, ylim=ylim)
+    plot_selection_rate_vs_accuracy_bar(tuples['generalized_gaussian'][0], tuples['generalized_gaussian'][1], colors=colors, ymin=ymin, ylim=ylim)
+    plot_selection_rate_vs_accuracy_bar(tuples['powerlaw'][0], tuples['powerlaw'][1], colors=colors, ymin=ymin, ylim=ylim)
 
 # %% usage
 if __name__ == '__main__':
     polyline_drawer(evaluation='cnn_subnetwork', feature='pcc')
+    barchart_drawer(evaluation='cnn_subnetwork', feature='pcc', ymin=50, ylim=100)
     polyline_drawer(evaluation='cnn_subnetwork', feature='plv')
+    barchart_drawer(evaluation='cnn_subnetwork', feature='plv', ymin=50, ylim=100)
     
     polyline_drawer(evaluation='svm_channel_selection', feature='de_LDS')
+    barchart_drawer(evaluation='svm_channel_selection', feature='de_LDS', ymin=50, ylim=100)
     polyline_drawer(evaluation='svm_channel_selection', feature='psd_LDS')
+    barchart_drawer(evaluation='svm_channel_selection', feature='psd_LDS', ymin=50, ylim=100)
