@@ -8,6 +8,7 @@ Created on Sat May 17 15:19:37 2025
 import numpy as np
 import matplotlib.pyplot as plt
 
+# %% executer
 def plot_selection_rate_vs_accuracy(
     title: str,
     data: dict,
@@ -97,6 +98,7 @@ def plot_selection_rate_vs_accuracy_bar(
     plt.tight_layout()
     plt.show()
 
+# %% svm eval; channel feature
 def plot_polyline_de():
     # %% argument: Averaged Performance across Decay Models
     title = "Selection Rate vs Performance of Channel Weights: Averaged Performance across Decay Models"
@@ -495,6 +497,7 @@ def plot_bar_chart_psd():
     plot_selection_rate_vs_accuracy_bar(title, data_avg,
         colors=['slategrey', 'steelblue', 'indianred', 'red', 'sandybrown', 'darkorange'])
     
+# %% subnetworks cnn eval; functional connectivity
 def plot_polyline_pcc():
     # %% argument: Averaged Performance across Decay Models
     title = "Selection Rate vs Performance of Channel Weights: Averaged Performance across Decay Models"
