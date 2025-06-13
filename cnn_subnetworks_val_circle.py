@@ -129,7 +129,7 @@ def cnn_subnetworks_evaluation_circle_control_2(argument='label_driven_mi_10_15'
     # Save
     if save:
         folder_name = 'results_cnn_subnetworks_evaluation'
-        file_name = f'cnn_validation_SubCM_{feature_cm}_by_LDMI.xlsx'
+        file_name = f'cnn_validation_SubCM_{feature_cm}_by_LD.xlsx'
         sheet_name = f'selection_rate_{selection_rate}'
         
         save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
@@ -283,10 +283,12 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 
 # %% Execute
 if __name__ == '__main__':
-    selection_rate_list = [1, 0.75, 0.5] # , 0.4, 0.3, 0.25]
+    # selection_rate_list = [1, 0.75, 0.5, 0.4, 0.3, 0.25] #, 0.2, 0.15, 0.1]
+    # selection_rate_list = [0.4, 0.3, 0.25] # 0.2, 0.15, 0.1]
+    selection_rate_list = [0.2, 0.15, 0.1]
     
     for selection_rate in selection_rate_list:
-        cnn_subnetworks_evaluation_circle_control_2(argument='label_driven_anova_10_15', selection_rate=selection_rate, feature_cm='pcc', save=True)
+        cnn_subnetworks_evaluation_circle_control_2(argument='label_driven_pcc_10_15', selection_rate=selection_rate, feature_cm='pcc', save=True)
         
         # cnn_subnetworks_evaluation_circle_control_1(argument='data_driven_plv_10_15', selection_rate=selection_rate, feature_cm='plv', save=True)
         # cnn_subnetworks_evaluation_circle_control_2(selection_rate=selection_rate, feature_cm='plv', save=True)
