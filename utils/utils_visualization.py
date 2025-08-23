@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # %% Visualization
-def draw_heatmap_1d(data, yticklabels=None):
+def draw_heatmap_1d(data, yticklabels=None, figsize=(2, 10)):
     """
     Plots a heatmap for an Nx1 array (vertical orientation).
 
@@ -28,7 +28,7 @@ def draw_heatmap_1d(data, yticklabels=None):
     
     data = np.array(data, dtype=float)
     
-    plt.figure(figsize=(2, 10))
+    plt.figure(figsize=figsize)
     sns.heatmap(
         data, 
         cmap='Blues',
