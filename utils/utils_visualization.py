@@ -12,7 +12,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # %% Visualization
-def draw_heatmap_1d(data, yticklabels=None, figsize=(2, 10)):
+def draw_heatmap_1d(data, yticklabels=None, figsize=(2, 10), title=None):
     """
     Plots a heatmap for an Nx1 array (vertical orientation).
 
@@ -22,6 +22,9 @@ def draw_heatmap_1d(data, yticklabels=None, figsize=(2, 10)):
     """
     if yticklabels is None:
         yticklabels = list(range(data.shape[0]))  # Automatically generate indices as labels
+    
+    if title == None:
+        title = "Vertical Heatmap of Nx1 Array"
     
     if len(data.shape) == 1:
         data = np.reshape(data, (-1, 1))
@@ -37,7 +40,7 @@ def draw_heatmap_1d(data, yticklabels=None, figsize=(2, 10)):
         xticklabels=False, 
         yticklabels=yticklabels
     )
-    plt.title("Vertical Heatmap of Nx1 Array")
+    plt.title(title)
     plt.show()
 
 def draw_joint_heatmap_1d(data_dict):

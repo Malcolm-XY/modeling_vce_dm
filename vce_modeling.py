@@ -230,79 +230,79 @@ if __name__ == '__main__':
     
     # %% Similarity between Matrices
     from sklearn.metrics.pairwise import cosine_similarity
-    def cosine_sim(A, B):
-        return cosine_similarity(A.flatten().reshape(1, -1), B.flatten().reshape(1, -1))[0][0]
+    def cosine_sim(A, B, redundancy=False, insert=""):
+        similarity = cosine_similarity(A.flatten().reshape(1, -1), B.flatten().reshape(1, -1))[0][0]
+        if redundancy:
+            print(f"Cosine Similarity: {insert} {similarity}")
+        return similarity
+    
+    def pearson_corr(A, B, redundancy=False, insert=""):
+        similarity = np.corrcoef(A.flatten(), B.flatten())[0, 1]
+        if redundancy:
+            print(f"Correlation Similarity: {insert} {similarity}")
+        return similarity
     
     cm_pcc_joint = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', sub_range=range(1,16))
     cm_pcc_alpha, cm_pcc_beta, cm_pcc_gamma = cm_pcc_joint['alpha'], cm_pcc_joint['beta'], cm_pcc_joint['gamma']
     
-    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_alpha)
-    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
-    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_beta)
-    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
-    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_gamma)
-    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    # Cosine Similartity
+    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_alpha, redundancy=True, insert="Euclidean Distances")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_beta, redundancy=True, insert="Euclidean Distances")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_gamma, redundancy=True, insert="Euclidean Distances")
     
-    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_alpha)
-    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
-    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_beta)
-    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
-    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_gamma)
-    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_alpha, redundancy=True, insert="Residual Euclidean Distances")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_beta, redundancy=True, insert="Residual Euclidean Distances")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_gamma, redundancy=True, insert="Residual Euclidean Distances")
     
+    # Spherical Distances
+    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_alpha, redundancy=True, insert="Spherical Distances")
+    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_beta, redundancy=True, insert="Spherical Distances")
+    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_gamma, redundancy=True, insert="Spherical Distances")
     
+    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_alpha, redundancy=True, insert="Residual Spherical Distances")
+    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_beta, redundancy=True, insert="Residual Spherical Distances")
+    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_gamma, redundancy=True, insert="Residual Spherical Distances")
     
+    # Correlation Similarity
+    similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_alpha, redundancy=True, insert="Euclidean Distances")
+    similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_beta, redundancy=True, insert="Euclidean Distances")
+    similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_gamma, redundancy=True, insert="Euclidean Distances")
     
+    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_alpha, redundancy=True, insert="Residual Euclidean Distances")
+    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_beta, redundancy=True, insert="Residual Euclidean Distances")
+    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_gamma, redundancy=True, insert="Residual Euclidean Distances")
     
-    
-    
-    similarity_cosine_stereo = cosine_sim(distance_matrix_sp_r, cm_pcc_joint)
-    print(f"The Cosine Similarity Between Stereo Distance Matrix and Connectivity Matrix is: {similarity_cosine_stereo}")
-    
-    from skimage.metrics import structural_similarity as ssim
-    similarity_ssim_euclidean = ssim(distance_matrix_r, cm_pcc_joint, data_range=1.0)
-    print(f"The SSIM Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_ssim_euclidean}")
-    similarity_ssim_ste = ssim(distance_matrix_ste_r, cm_pcc_joint, data_range=1.0)
-    print(f"The SSIM Similarity Between Stereo Distance Matrix and Connectivity Matrix is: {similarity_ssim_ste}")
-
-    def pearson_corr(A, B):
-        return np.corrcoef(A.flatten(), B.flatten())[0, 1]
-    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_joint)
-    print(f"The Correlation Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_corr_euclidean}")
-    similarity_corr_ste = pearson_corr(distance_matrix_ste_r, cm_pcc_joint)
-    print(f"The Correlation Similarity Between Stereo Distance Matrix and Connectivity Matrix is: {similarity_corr_ste}")
-    
-    # %% Factor Matrix
+    # %% Factor Matrix; Basic Model
     factor_matrix = compute_volume_conduction_factors_basic_model(distance_matrix)
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
     
-    factor_matrix_ste = compute_volume_conduction_factors_basic_model(distance_matrix_ste)
-    factor_matrix_ste = feature_engineering.normalize_matrix(factor_matrix_ste)
-    utils_visualization.draw_projection(factor_matrix_ste)
+    factor_matrix_sp = compute_volume_conduction_factors_basic_model(distance_matrix_sp)
+    factor_matrix_sp = feature_engineering.normalize_matrix(factor_matrix_sp)
+    utils_visualization.draw_projection(factor_matrix_sp)
 
     # %% Recovered Connectivity Matrix; Close to Genuine Connectivity Matrix
-    differ_PCC_DM = cm_pcc_joint - factor_matrix
-    utils_visualization.draw_projection(differ_PCC_DM)
+    differ_PCC_DM = cm_pcc_alpha - factor_matrix
+    utils_visualization.draw_projection(differ_PCC_DM, title="Recovered FN, Euclidean DM-based")
     
-    differ_PCC_DM_ste = cm_pcc_joint - factor_matrix_ste
-    utils_visualization.draw_projection(differ_PCC_DM_ste)
+    differ_PCC_DM_sp = cm_pcc_alpha - factor_matrix_sp
+    utils_visualization.draw_projection(differ_PCC_DM_sp, title="Recovered FN, Spherical DM-based")
     
     # %% Recovered Channel Weight
     electrodes = utils_feature_loading.read_distribution('seed')['channel']
     
     channel_weight = np.mean(differ_PCC_DM, axis=0)
-    utils_visualization.draw_heatmap_1d(channel_weight, electrodes)
+    utils_visualization.draw_heatmap_1d(channel_weight, electrodes, title="Channel Importance, Euclidean DM-based")
     
-    channel_weight_ste = np.mean(differ_PCC_DM_ste, axis=0)
-    utils_visualization.draw_heatmap_1d(channel_weight_ste, electrodes)
+    channel_weight_sp = np.mean(differ_PCC_DM_sp, axis=0)
+    utils_visualization.draw_heatmap_1d(channel_weight_sp, electrodes, title="Channel Importance, Spherical DM-based")
     
     # %% Label-Driven-MI-Based Channel Weight
-    import drawer_channel_weight
-    weights_LD_MI = drawer_channel_weight.get_ranking_weight(ranking='label_driven_mi')
-    index = drawer_channel_weight.get_index(ranking='label_driven_mi')
-    utils_visualization.draw_heatmap_1d(weights_LD_MI, electrodes)
-    drawer_channel_weight.draw_weight_map_from_data(index, weights_LD_MI)
+    # import drawer_channel_weight
+    # weights_LD_MI = drawer_channel_weight.get_ranking_weight(ranking='label_driven_mi')
+    # index = drawer_channel_weight.get_index(ranking='label_driven_mi')
+    # utils_visualization.draw_heatmap_1d(weights_LD_MI, electrodes)
+    # drawer_channel_weight.draw_weight_map_from_data(index, weights_LD_MI)
     
     # %% Matrix of differ(Connectivity_Matrix_PCC, Factor_Matrix); stereo distance matrix; generalized_gaussian
     # Target
