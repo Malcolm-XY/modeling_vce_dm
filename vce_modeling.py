@@ -202,38 +202,61 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, method='e
 
 if __name__ == '__main__':  
     # %% Load Connectivity Matrix
-    cm_pcc_joint = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', 'mat')['joint']
-    cm_pcc_joint = feature_engineering.normalize_matrix(np.array(cm_pcc_joint))
+    cm_pcc_joint = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', sub_range=range(1,16))
+    cm_pcc_joint = np.array([cm_pcc_joint['alpha'], cm_pcc_joint['beta'], cm_pcc_joint['gamma']])
     utils_visualization.draw_projection(cm_pcc_joint)
     
-    cm_plv_joint = utils_feature_loading.read_fcs_global_average('seed', 'plv', 'joint', 'mat')['joint']
-    cm_plv_joint = feature_engineering.normalize_matrix(np.array(cm_plv_joint))
+    cm_plv_joint = utils_feature_loading.read_fcs_global_average('seed', 'plv', 'joint', sub_range=range(1,16))
+    cm_plv_joint = np.array([cm_plv_joint['alpha'], cm_plv_joint['beta'], cm_plv_joint['gamma']])
     utils_visualization.draw_projection(cm_plv_joint)
 
     # %% Distance Matrix
-    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
+    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", 
+                                                                     projection_params={"type": "3d_euclidean"}, visualize=True)
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
     utils_visualization.draw_projection(distance_matrix)
 
-    _, distance_matrix_ste = feature_engineering.compute_distance_matrix('seed', method='stereo', stereo_params={'prominence': 0.1, 'epsilon': 0.01}, visualize=True)
-    distance_matrix_ste = feature_engineering.normalize_matrix(distance_matrix_ste)
-    utils_visualization.draw_projection(distance_matrix_ste)
+    _, distance_matrix_sp = feature_engineering.compute_distance_matrix(dataset="seed", 
+                                                                        projection_params={"type": "3d_spherical"}, visualize=True)
+    distance_matrix_sp = feature_engineering.normalize_matrix(distance_matrix_sp)
+    utils_visualization.draw_projection(distance_matrix_sp)
     
     # %% Reversed Distance Matrix
     distance_matrix_r =  1 - distance_matrix
     utils_visualization.draw_projection(distance_matrix_r)
     
-    distance_matrix_ste_r =  1 - distance_matrix_ste
-    utils_visualization.draw_projection(distance_matrix_ste_r)
+    distance_matrix_sp_r =  1 - distance_matrix_sp
+    utils_visualization.draw_projection(distance_matrix_sp_r)
     
-    # %% Similarity
+    # %% Similarity between Matrices
     from sklearn.metrics.pairwise import cosine_similarity
     def cosine_sim(A, B):
         return cosine_similarity(A.flatten().reshape(1, -1), B.flatten().reshape(1, -1))[0][0]
-
-    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_joint)
+    
+    cm_pcc_joint = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', sub_range=range(1,16))
+    cm_pcc_alpha, cm_pcc_beta, cm_pcc_gamma = cm_pcc_joint['alpha'], cm_pcc_joint['beta'], cm_pcc_joint['gamma']
+    
+    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_alpha)
     print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
-    similarity_cosine_stereo = cosine_sim(distance_matrix_ste_r, cm_pcc_joint)
+    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_beta)
+    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix, cm_pcc_gamma)
+    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    
+    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_alpha)
+    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_beta)
+    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_gamma)
+    print(f"The Cosine Similarity Between Euclidean Distance Matrix and Connectivity Matrix is: {similarity_cosine_euclidean}")
+    
+    
+    
+    
+    
+    
+    
+    similarity_cosine_stereo = cosine_sim(distance_matrix_sp_r, cm_pcc_joint)
     print(f"The Cosine Similarity Between Stereo Distance Matrix and Connectivity Matrix is: {similarity_cosine_stereo}")
     
     from skimage.metrics import structural_similarity as ssim
