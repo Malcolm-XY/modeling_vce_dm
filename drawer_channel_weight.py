@@ -12,29 +12,17 @@ import matplotlib.pyplot as plt
 
 from utils import utils_feature_loading
 
-def get_ranking_weight(ranking='label_driven_mi'):
+def get_channel_importance(folder='channel_importances', excel='channel_importances_LD.xlsx', sheet='label_driven_mi_1_5'):
     # define path
     path_current = os.getcwd()
 
-    path_ranking = os.path.join(path_current, 'Distribution', 'Electrode_Rankings', 'electrodes_ranking.xlsx')
+    path_excel = os.path.join(path_current, folder, excel)
 
-    # read xlxs; electrodes ranking
-    ranking = pd.read_excel(path_ranking, sheet_name=ranking, engine='openpyxl')
-    weight = ranking['mean']
+    # read xlxs; channel importance
+    importance = pd.read_excel(path_excel, sheet_name=sheet, engine='openpyxl')
+    importance = importance['ams']
 
-    return weight
-
-def get_index(ranking='label_driven_mi'):
-    # define path
-    path_current = os.getcwd()
-
-    path_ranking = os.path.join(path_current, 'Distribution', 'Electrode_Rankings', 'electrodes_ranking.xlsx')
-
-    # read xlxs; electrodes ranking
-    ranking = pd.read_excel(path_ranking, sheet_name=ranking, engine='openpyxl')
-    index = ranking['index(in origin dataset)']
-
-    return index
+    return importance
 
 def rank_channel_strength(node_strengths, electrode_labels, ascending=False, exclude_electrodes=None):
     """
@@ -218,4 +206,4 @@ if __name__ == '__main__':
 
     # draw_weight_map_from_file(transformation=None, ranking_method='data_driven_plv')
     
-    weight = get_ranking_weight(ranking='label_driven_mi')
+    channel_importance = get_channel_importance(sheet='label_driven_mi_1_5')

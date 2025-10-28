@@ -161,7 +161,7 @@ def Compute_Feature_Mean_SEED(subject_range=range(1,2), experiment_range=range(1
     计算SEED数据集某种特征（如MI、ANOVA）的平均值，支持多被试和实验。
     """
     # labels upsampling    
-    labels = np.reshape(utils_feature_loading.read_labels(dataset), -1)
+    labels = np.reshape(utils_feature_loading.read_labels(dataset, header=True), -1)
     
     feature_list = []
     normed_feature_list = []
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     
     # compute feature arrays
     measurement = 'mi' # 'mi', 'a-nova', 'pcc', 'sc', 'cc'
-    subject_range, experiment_range = range(1,11), range(1,4)
+    subject_range, experiment_range = range(11,16), range(1,4)
     feature_arrays_mean, feature_arrays_mean_normed = Compute_Feature_Mean_SEED(subject_range, experiment_range, 
                                                 electrodes, 'seed', 'upsampling', measurement)
     utils_visualization.draw_heatmap_1d(feature_arrays_mean[measurement], feature_arrays_mean['electrodes'])
