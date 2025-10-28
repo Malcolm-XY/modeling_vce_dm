@@ -298,19 +298,18 @@ if __name__ == '__main__':
     utils_visualization.draw_heatmap_1d(channel_weight_sp, electrodes, title="Channel Importance, Spherical DM-based")
     
     # %% Label-Driven-MI-Based Channel Weight
-    # import drawer_channel_weight
-    # weights_LD_MI = drawer_channel_weight.get_ranking_weight(ranking='label_driven_mi')
-    # index = drawer_channel_weight.get_index(ranking='label_driven_mi')
-    # utils_visualization.draw_heatmap_1d(weights_LD_MI, electrodes)
-    # drawer_channel_weight.draw_weight_map_from_data(index, weights_LD_MI)
+    import ci_management
+    cis_LD_MI = ci_management.read_channel_importances(sheet='label_driven_mi_1_5')
+    utils_visualization.draw_heatmap_1d(cis_LD_MI['ams'], electrodes)
+    ci_management.draw_importance_map_from_data(cis_LD_MI['ams'])
     
     # %% Matrix of differ(Connectivity_Matrix_PCC, Factor_Matrix); stereo distance matrix; generalized_gaussian
     # Target
-    import drawer_channel_weight
-    drawer_channel_weight.draw_weight_map_from_file(ranking_method='label_driven_mi')
+    import ci_management
+    ci_management.draw_importance_map_from_file(ranking_method='label_driven_mi_1_5')
     
     # Fitted
-    channel_names, distance_matrix = feature_engineering.compute_distance_matrix('seed', method='stereo')
+    channel_names, distance_matrix = feature_engineering.compute_distance_matrix('seed')
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
     utils_visualization.draw_projection(distance_matrix)
 
@@ -318,12 +317,15 @@ if __name__ == '__main__':
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
     utils_visualization.draw_projection(factor_matrix)
 
-    global_joint_average = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', 'mat')['joint']
+    global_joint_average = utils_feature_loading.read_fcs_global_average('seed', 'pcc', 'joint', sub_range=range(1, 6))
+    global_joint_average = global_joint_average['alpha']+global_joint_average['beta']+global_joint_average['gamma']
     global_joint_average = feature_engineering.normalize_matrix(global_joint_average)
     utils_visualization.draw_projection(global_joint_average)
 
     differ_PCC_DM = global_joint_average - factor_matrix
     utils_visualization.draw_projection(differ_PCC_DM)
+    
+    
     
     # transform from Matrix to Rank
     weight_fitted = np.mean(differ_PCC_DM, axis=0)
