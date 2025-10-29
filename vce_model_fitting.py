@@ -14,15 +14,15 @@ from scipy.optimize import differential_evolution
 
 import feature_engineering
 import vce_modeling
-import cw_manager
+import ci_management
 
-# %% Normalize and prune CW
-def prune_cw(cw, normalize_method='minmax', transform_method='boxcox'):
-    cw = feature_engineering.normalize_matrix(cw, transform_method)
-    cw = feature_engineering.normalize_matrix(cw, normalize_method)
-    return cw
+# %% Normalize and prune CI
+def prune_ci(ci, normalize_method='minmax', transform_method='boxcox'):
+    ci = feature_engineering.normalize_matrix(ci, transform_method)
+    ci = feature_engineering.normalize_matrix(ci, normalize_method)
+    return ci
 
-# %% Compute CM, get CW as Agent of GCM and RCM
+# %% Compute CM, get CI as Agent of GCM and RCM
 from utils import utils_feature_loading, utils_visualization
 def preprocessing_cm_global_averaged(cm_global_averaged, coordinates):
     # Global averaged connectivity matrix; For subsquent fitting computation
@@ -46,9 +46,9 @@ def preprocessing_cm_global_averaged(cm_global_averaged, coordinates):
     
     return cm_global_averaged
 
-def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi', idxs_manual_remove=None):
+def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_1_5', idxs_manual_remove=None):
     """
-    Prepares smoothed channel weights, distance matrix, and global averaged connectivity matrix,
+    Prepares smoothed channel importances, distance matrix, and global averaged connectivity matrix,
     with optional removal of specified bad channels.
 
     Parameters
@@ -62,45 +62,48 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi', i
 
     Returns
     -------
-    cw_target_smooth : np.ndarray of shape (n,)
+    ci_target_smooth : np.ndarray of shape (n,)
     distance_matrix : np.ndarray of shape (n, n)
-    cm_global_averaged : np.ndarray of shape (n, n)
+    ci_global_averaged : np.ndarray of shape (n, n)
     """
     # === 0. Electrodes; Remove specified channels
     electrodes = np.array(utils_feature_loading.read_distribution('seed')['channel'])
     electrodes = feature_engineering.remove_idx_manual(electrodes, idxs_manual_remove)
     
-    # === 1. Target channel weight
-    channel_weights = cw_manager.read_channel_weight_LD(identifier=ranking_method, sort=False)['ams']
-    cw_target = prune_cw(channel_weights.to_numpy())
+    # === 1. Target channel importances
+    channel_importances = ci_management.read_channel_importances(sheet=ranking_method)['ams']
+    
+    ci_target = prune_ci(channel_importances.to_numpy())
     # ==== 1.1 Remove specified channels
-    cw_target = feature_engineering.remove_idx_manual(cw_target, idxs_manual_remove)
+    ci_target = feature_engineering.remove_idx_manual(ci_target, idxs_manual_remove)
     # === 1.2 Coordinates and smoothing
     coordinates = utils_feature_loading.read_distribution('seed')
     coordinates = coordinates.drop(idxs_manual_remove)
-    cw_target_smooth = feature_engineering.spatial_gaussian_smoothing_on_vector(cw_target, coordinates, 2.0)
+    ci_target_smooth = feature_engineering.spatial_gaussian_smoothing_on_vector(ci_target, coordinates, 2.0)
 
     # === 2. Distance matrix
-    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
+    _, distance_matrix = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"})
     # === 2.1 Remove specified channels
     distance_matrix = feature_engineering.remove_idx_manual(distance_matrix, idxs_manual_remove)
     # === 2.2 Normalization
     distance_matrix = feature_engineering.normalize_matrix(distance_matrix)
 
     # === 3. Connectivity matrix
-    connectivity_matrix_global_joint_averaged = utils_feature_loading.read_fcs_global_average('seed', feature, 'joint', 'mat')['joint']
+    cm_global_averaged = utils_feature_loading.read_fcs_global_average('seed', feature, 'joint')
+    connectivity_matrix_global_joint_averaged = np.mean([cm_global_averaged['alpha'], cm_global_averaged['beta'], 
+                                                         cm_global_averaged['gamma']], axis=0)
     
     # === 3.1 Remove specified channels
     cm_global_averaged = feature_engineering.remove_idx_manual(connectivity_matrix_global_joint_averaged, idxs_manual_remove)
     # === 3.2 Smoothing
     cm_global_averaged = preprocessing_cm_global_averaged(cm_global_averaged, coordinates)
 
-    return electrodes, cw_target_smooth, distance_matrix, cm_global_averaged
+    return electrodes, ci_target_smooth, distance_matrix, cm_global_averaged
 
 # Here utilized VCE Model/FM=M(DM) Model
-def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix, RCM='differ'):
+def compute_ci_fitting(method, params_dict, distance_matrix, connectivity_matrix, RCM='differ'):
     """
-    Compute cw_fitting based on selected RCM method: differ, linear, or linear_ratio.
+    Compute ci_fitting based on selected RCM method: differ, linear, or linear_ratio.
     """
     RCM = RCM.lower()
 
@@ -129,12 +132,12 @@ def compute_cw_fitting(method, params_dict, distance_matrix, connectivity_matrix
     # Step 3: Normalize RCM
     cm_recovered = feature_engineering.normalize_matrix(cm_recovered)
 
-    # Step 4: Compute CW
-    global cw_fitting
-    cw_fitting = np.mean(cm_recovered, axis=0)
-    cw_fitting = prune_cw(cw_fitting)
+    # Step 4: Compute CI
+    global ci_fitting
+    ci_fitting = np.mean(cm_recovered, axis=0)
+    ci_fitting = prune_ci(ci_fitting)
 
-    return cw_fitting
+    return ci_fitting
 
 # %% Optimization
 def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix, RCM='differ'):
@@ -142,13 +145,13 @@ def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, con
     params = dict(zip(param_keys, res.x))
     
     result = {'params': params, 'loss': res.fun}
-    cw_fitting = compute_cw_fitting(method, params, distance_matrix, connectivity_matrix, RCM)
+    ci_fitting = compute_ci_fitting(method, params, distance_matrix, connectivity_matrix, RCM)
     
-    return result, cw_fitting
+    return result, ci_fitting
 
-def loss_fn_template(method_name, param_dict_fn, cw_target, distance_matrix, connectivity_matrix, RCM):
+def loss_fn_template(method_name, param_dict_fn, ci_target, distance_matrix, connectivity_matrix, RCM):
     def loss_fn(params):
-        loss = np.mean((compute_cw_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix, RCM) - cw_target) ** 2)
+        loss = np.mean((compute_ci_fitting(method_name, param_dict_fn(params), distance_matrix, connectivity_matrix, RCM) - ci_target) ** 2)
         return loss
     return loss_fn
 
@@ -382,23 +385,23 @@ class FittingConfig:
         },
     }
 
-def fitting_model(model_type='basic', recovery_type='differ', cw_target=None, distance_matrix=None, connectivity_matrix=None):
+def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, distance_matrix=None, connectivity_matrix=None):
     """
     Perform model fitting across multiple methods.
 
     Args:
         model_type (str): 'basic' or 'advanced'
         recovery_type (str): 'differ', 'linear', 'linear_ratio'
-        cw_target (np.ndarray): Target feature vector
+        ci_target (np.ndarray): Target feature vector
         distance_matrix (np.ndarray): Distance matrix
         connectivity_matrix (np.ndarray): Connectivity matrix
 
     Returns:
         results (dict): Optimized parameters and losses
-        cws_fitting (dict): Fitted CW vectors
+        cis_fitting (dict): Fitted CI vectors
     """
 
-    results, cws_fitting = {}, {}
+    results, cis_fitting = {}, {}
 
     # Load fitting configuration
     fitting_config = FittingConfig.get_config(model_type, recovery_type)
@@ -411,11 +414,11 @@ def fitting_model(model_type='basic', recovery_type='differ', cw_target=None, di
         param_func = FittingConfig.make_param_func(param_names)
 
         # Build loss function
-        loss_fn = loss_fn_template(method, param_func, cw_target, distance_matrix, connectivity_matrix, RCM=recovery_type)
+        loss_fn = loss_fn_template(method, param_func, ci_target, distance_matrix, connectivity_matrix, RCM=recovery_type)
 
         # Optimize
         try:
-            results[method], cws_fitting[method] = optimize_and_store(
+            results[method], cis_fitting[method] = optimize_and_store(
                 method,
                 loss_fn,
                 bounds,
@@ -426,7 +429,7 @@ def fitting_model(model_type='basic', recovery_type='differ', cw_target=None, di
             )
         except Exception as e:
             print(f"[{method.upper()}] Optimization failed: {e}")
-            results[method], cws_fitting[method] = None, None
+            results[method], cis_fitting[method] = None, None
 
     print("\n=== Fitting Results of All Models (Minimum MSE) ===")
     for method, result in results.items():
@@ -435,7 +438,7 @@ def fitting_model(model_type='basic', recovery_type='differ', cw_target=None, di
         else:
             print(f"[{method.upper()}] Optimization Failed.")
 
-    return results, cws_fitting
+    return results, cis_fitting
 
 # %% Sort
 def sort_ams(ams, labels, original_labels=None):
@@ -492,14 +495,14 @@ def draw_scatter_multi_method(x, A, fittings_dict, pltlabels=None, save_path=Non
     Args:
         x (array-like): 横轴标签（如电极名或编号）
         A: target (array-like): 目标通道权重
-        fittings_dict (dict): {method_name: cw_fitting_array}
+        fittings_dict (dict): {method_name: ci_fitting_array}
         pltlabels (dict): {'title': str, 'label_x': str, 'label_y': str, 'label_target': str}
-        save_path (str or None): 若指定路径则保存图像（如 'figs/cw_comparison.pdf'）
+        save_path (str or None): 若指定路径则保存图像（如 'figs/ci_comparison.pdf'）
     """
     # 默认标签
     if pltlabels is None:
-        pltlabels = {'title': 'Comparison of Channel Weights across various Models',
-                     'label_x': 'Electrodes', 'label_y': 'Channel Weight',
+        pltlabels = {'title': 'Comparison of Channel Importances across various Models',
+                     'label_x': 'Electrodes', 'label_y': 'Channel Importance',
                      'label_A': 'target', 'label_B': 'label_B'}
 
     # 提取标签
@@ -543,9 +546,9 @@ def draw_scatter_subplots_vertical(x, A, fittings_dict, pltlabels=None, save_pat
     Args:
         x (array-like): 横轴坐标（如电极标签）
         A: target (array-like): 目标通道权重
-        fittings_dict (dict): {method_name: cw_fitting_array}
+        fittings_dict (dict): {method_name: ci_fitting_array}
         pltlabels (dict): {'title': str, 'label_x': str, 'label_y': str, 'label_target': str}
-        save_path (str or None): 若指定路径则保存图像（如 'figs/cw_subplot.pdf'）
+        save_path (str or None): 若指定路径则保存图像（如 'figs/ci_subplot.pdf'）
     """
     if pltlabels is None:
         pltlabels = {'title': 'Comparison of Channel Weights across various Models',
@@ -571,7 +574,7 @@ def draw_scatter_subplots_vertical(x, A, fittings_dict, pltlabels=None, save_pat
         mse = mean_squared_error(A, B)
 
         ax.plot(x, A, label=label_A, linestyle='-', marker='o', color='black')
-        label_B = f'CW of RCM; FM model: {method} (MSE={mse:.4f})'
+        label_B = f'CI of RCM; FM model: {method} (MSE={mse:.4f})'
         ax.plot(x, B, label=label_B, linestyle='--', marker='x')
 
         ax.set_ylabel(label_y)
@@ -593,7 +596,7 @@ def draw_scatter_subplots_vertical(x, A, fittings_dict, pltlabels=None, save_pat
 
 # topography
 import mne
-def plot_cw_topomap(
+def plot_ci_topomap(
     amps_df, label_col='labels', amp_col='ams',
     montage=None, distribution_df=None, normalize=True,
     title='Topomap'):
@@ -771,12 +774,12 @@ def save_fitting_results(results, save_dir='results', file_name='fitting_results
 
     print(f"Fitting results saved to {results_path}")
 
-def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_weights.xlsx'):
+def save_channel_weights(cis_fitting, save_dir='results', file_name='channel_weights.xlsx'):
     """
     将包含多个 DataFrame 的字典保存为一个 Excel 文件，不同的 sheet 存储不同的 DataFrame。
 
     Args:
-        cws_fitting (dict): 键是 sheet 名，值是 DataFrame 或可以转换成 DataFrame 的数据结构。
+        cis_fitting (dict): 键是 sheet 名，值是 DataFrame 或可以转换成 DataFrame 的数据结构。
         save_dir (str): 保存目录，默认为 'results'。
         file_name (str): 保存的文件名，默认为 'channel_weights.xlsx'。
     """
@@ -789,7 +792,7 @@ def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_wei
 
     # 写入Excel
     with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
-        for sheet_name, data in cws_fitting.items():
+        for sheet_name, data in cis_fitting.items():
             # 安全处理sheet名：截断长度，替换非法字符
             valid_sheet_name = sheet_name[:31].replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace(':', '_').replace('[', '_').replace(']', '_')
 
@@ -803,24 +806,24 @@ def save_channel_weights(cws_fitting, save_dir='results', file_name='channel_wei
     print(f"Channel weights successfully saved to {save_path}")
 
 # %% Usage
-if __name__ == '__main__':
+if __name__ == '__main_':
     # Fittin target and DM
     channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc_10_15', 
-                                                    'label_driven_mi_10_15', channel_manual_remove)
+    electrodes, ci_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
+                                                    'label_driven_mi_1_5', channel_manual_remove)
     
-    # electrodes, cw_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
+    # or # electrodes, ci_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
     #                                                 'label_driven_mi', channel_manual_remove)
     
     # %% Fitting
-    fm_model, rcm_model = 'advanced', 'linear_ratio'
-    results, cws_fitting = fitting_model(fm_model, rcm_model, cw_target, distance_matrix, cm_global_averaged)
+    fm_model, rcm_model = 'advanced', 'linear_ratio' # 'basic', 'advanced'; 'differ', 'linear', 'linear_ratio'
+    results, cis_fitting = fitting_model(fm_model, rcm_model, ci_target, distance_matrix, cm_global_averaged)
     
-    # %% Insert target cw (LDMI) and cm cw non modeled
-    cw_non_modeled = np.mean(cm_global_averaged, axis=0)
-    cw_non_modeled = feature_engineering.normalize_matrix(cw_non_modeled)
+    # %% Insert target cw (LDMI) and cm ci non modeled
+    ci_non_modeled = np.mean(cm_global_averaged, axis=0)
+    ci_non_modeled = feature_engineering.normalize_matrix(ci_non_modeled)
     
-    cws_fitting = {'target': cw_target,'non_modeled': cw_non_modeled, **cws_fitting}
+    cis_fitting = {'target': ci_target,'non_modeled': ci_non_modeled, **cis_fitting}
     
     # %% Sort ranks of channel weights based on fitted models
     # electrodes
@@ -828,8 +831,8 @@ if __name__ == '__main__':
     
     # fitted
     cws_fitted, cws_sorted = {}, {}
-    for method, cw_fitted in cws_fitting.items():
-        cw_fitted_temp = feature_engineering.insert_idx_manual(cws_fitting[method], channel_manual_remove, value=0)
+    for method, cw_fitted in cis_fitting.items():
+        cw_fitted_temp = feature_engineering.insert_idx_manual(cis_fitting[method], channel_manual_remove, value=0)
         cws_fitted[method] = cw_fitted_temp
         cw_sorted_temp = sort_ams(cw_fitted_temp, electrodes_original, electrodes_original)
         cws_sorted[method] = cw_sorted_temp
@@ -841,9 +844,9 @@ if __name__ == '__main__':
     save_channel_weights(cws_sorted, results_path, f'channel_weights({fm_model}_fm_{rcm_model}_rcm).xlsx')
     
     # %% Validation of Fitting Comparison
-    pltlabels = {'title':'Comparison of Fitted Channel Weights across various Models',
-                 'label_x':'Electrodes', 'label_y':'Channel Weight', 
-                 'label_A':'CW of target: LD MI', 'label_B':'CW of RCM; by Modeled FM'}
+    pltlabels = {'title':'Comparison of Fitted Channel Importances across various Models',
+                 'label_x':'Electrodes', 'label_y':'Channel Importance', 
+                 'label_A':'CI of target: LD MI', 'label_B':'CI of RCM; by Modeled FM'}
     
     # plot by list
     # pltlabels_non_modeled = pltlabels.copy()
@@ -857,9 +860,9 @@ if __name__ == '__main__':
     #     draw_scatter_comparison(electrodes, cw_target, cw_fitting, _pltlabels)
     
     # joint scatter
-    draw_scatter_multi_method(electrodes, cw_target, cws_fitting, pltlabels)
+    draw_scatter_multi_method(electrodes, ci_target, cis_fitting, pltlabels)
     
-    draw_scatter_subplots_vertical(electrodes, cw_target, cws_fitting, pltlabels)
+    draw_scatter_subplots_vertical(electrodes, ci_target, cis_fitting, pltlabels)
     
     # %% Validation of Brain Topography
     # mne topography
@@ -867,6 +870,6 @@ if __name__ == '__main__':
     plot_joint_topomaps(amps_dict=cws_sorted, distribution_df=distribution, title="All Method Comparison")
     
     # %% Validation of Heatmap
-    cws_fitting['cw_target'] = cw_target
-    utils_visualization.draw_joint_heatmap_1d(cws_fitting)
+    cis_fitting['ci_target'] = ci_target
+    utils_visualization.draw_joint_heatmap_1d(cis_fitting)
     

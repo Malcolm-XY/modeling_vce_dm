@@ -5,8 +5,6 @@ Created on Tue Jan 14 23:07:14 2025
 @author: 18307
 """
 
-import os
-import h5py
 import numpy as np
 
 import feature_engineering
@@ -325,8 +323,6 @@ if __name__ == '__main__':
     differ_PCC_DM = global_joint_average - factor_matrix
     utils_visualization.draw_projection(differ_PCC_DM)
     
-    
-    
     # transform from Matrix to Rank
     weight_fitted = np.mean(differ_PCC_DM, axis=0)
     from sklearn.preprocessing import MinMaxScaler
@@ -342,6 +338,6 @@ if __name__ == '__main__':
     
     # resort
     weight_channels = np.mean(differ_PCC_DM, axis=0)
-    strength_origin, strength_ranked, rank_indices = drawer_channel_weight.rank_channel_strength(weight_fitted, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
+    strength_origin, strength_ranked, rank_indices = ci_management.rank_channel_importances(weight_fitted, electrodes) #, exclude_electrodes=['CB1', 'CB2'])
     
-    drawer_channel_weight.draw_weight_map_from_data(rank_indices, strength_ranked['Strength'])
+    ci_management.draw_importance_map_from_data(rank_indices, strength_ranked['Strength'])
