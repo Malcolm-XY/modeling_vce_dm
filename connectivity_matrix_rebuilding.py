@@ -70,7 +70,7 @@ def example_usage():
     import numpy as np
     import feature_engineering
     from utils import utils_feature_loading, utils_visualization
-    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d"})
+    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"})
     dm = feature_engineering.normalize_matrix(dm)
     utils_visualization.draw_projection(dm, 'Distance Matrix')
     

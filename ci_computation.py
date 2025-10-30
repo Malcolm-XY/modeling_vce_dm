@@ -269,7 +269,7 @@ if __name__ == "__main__":
     
     # compute feature arrays
     measurement = 'mi' # 'mi', 'a-nova', 'pcc', 'sc', 'cc'
-    subject_range, experiment_range = range(11,16), range(1,4)
+    subject_range, experiment_range = range(1,6), range(1,4)
     feature_arrays_mean, feature_arrays_mean_normed = Compute_Feature_Mean_SEED(subject_range, experiment_range, 
                                                 electrodes, 'seed', 'upsampling', measurement)
     utils_visualization.draw_heatmap_1d(feature_arrays_mean[measurement], feature_arrays_mean['electrodes'])

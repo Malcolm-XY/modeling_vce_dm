@@ -253,22 +253,22 @@ if __name__ == '__main__':
     similarity_cosine_euclidean = cosine_sim(distance_matrix_r, cm_pcc_gamma, redundancy=True, insert="Residual Euclidean Distances")
     
     # Spherical Distances
-    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_alpha, redundancy=True, insert="Spherical Distances")
-    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_beta, redundancy=True, insert="Spherical Distances")
-    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_gamma, redundancy=True, insert="Spherical Distances")
+    similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_alpha, redundancy=True, insert="Spherical Distances")
+    similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_beta, redundancy=True, insert="Spherical Distances")
+    similarity_cosine_spherical = cosine_sim(distance_matrix_sp, cm_pcc_gamma, redundancy=True, insert="Spherical Distances")
     
-    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_alpha, redundancy=True, insert="Residual Spherical Distances")
-    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_beta, redundancy=True, insert="Residual Spherical Distances")
-    # similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_gamma, redundancy=True, insert="Residual Spherical Distances")
+    similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_alpha, redundancy=True, insert="Residual Spherical Distances")
+    similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_beta, redundancy=True, insert="Residual Spherical Distances")
+    similarity_cosine_spherical = cosine_sim(distance_matrix_sp_r, cm_pcc_gamma, redundancy=True, insert="Residual Spherical Distances")
     
-    # Correlation Similarity
-    similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_alpha, redundancy=True, insert="Euclidean Distances")
-    similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_beta, redundancy=True, insert="Euclidean Distances")
-    similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_gamma, redundancy=True, insert="Euclidean Distances")
+    # # Correlation Similarity
+    # similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_alpha, redundancy=True, insert="Euclidean Distances")
+    # similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_beta, redundancy=True, insert="Euclidean Distances")
+    # similarity_corr_euclidean = pearson_corr(distance_matrix, cm_pcc_gamma, redundancy=True, insert="Euclidean Distances")
     
-    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_alpha, redundancy=True, insert="Residual Euclidean Distances")
-    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_beta, redundancy=True, insert="Residual Euclidean Distances")
-    similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_gamma, redundancy=True, insert="Residual Euclidean Distances")
+    # similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_alpha, redundancy=True, insert="Residual Euclidean Distances")
+    # similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_beta, redundancy=True, insert="Residual Euclidean Distances")
+    # similarity_corr_euclidean = pearson_corr(distance_matrix_r, cm_pcc_gamma, redundancy=True, insert="Residual Euclidean Distances")
     
     # %% Factor Matrix; Basic Model
     factor_matrix = compute_volume_conduction_factors_basic_model(distance_matrix)

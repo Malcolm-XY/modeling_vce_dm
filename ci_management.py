@@ -28,14 +28,14 @@ def read_channel_importances(folder='channel_importances', excel='channel_import
     return importances
 
 def read_channel_importances_fitted(model_fm='basic', model_rcm='differ', model='exponential', 
-                                source='fitted_results(15_15_joint_band_from_mat)', sort=False):
+                                source='fitted_results(sub1_sub5_joint_band)', sort=False):
     model_fm = model_fm.lower()
     model_rcm = model_rcm.lower()
     model = model.lower()
     
     path_current = os.getcwd()
     path_file = os.path.join(path_current, 'fitted_results', source, 
-                             f'channel_weights({model_fm}_fm_{model_rcm}_rcm).xlsx')
+                             f'channel_importances({model_fm}_fm_{model_rcm}_rcm).xlsx')
 
     channel_importances = pd.read_excel(path_file, sheet_name=model, engine='openpyxl')
     
@@ -179,10 +179,10 @@ def draw_importance_map_from_data(importances, offset=0, transformation=None, re
 
 if __name__ == '__main__':
     # miportances of target and fitted
-    importances_target = read_channel_importances(sheet='label_driven_mi_10_15', sort=False)
+    importances_target = read_channel_importances(sheet='label_driven_mi_1_5', sort=False)
     draw_importance_map_from_data(importances_target['ams'])
     importances_fitted = read_channel_importances_fitted(model_fm='basic', model_rcm='differ', model='exponential',
-                                                 source='fitted_results(10_15_joint_band_from_mat)', sort=False)
+                                                 source='fitted_results(1_5_joint_band_from_mat)', sort=False)
     draw_importance_map_from_data(importances_fitted['ams'])
     
     # channel importance map

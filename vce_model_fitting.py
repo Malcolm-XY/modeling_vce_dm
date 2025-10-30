@@ -774,7 +774,7 @@ def save_fitting_results(results, save_dir='results', file_name='fitting_results
 
     print(f"Fitting results saved to {results_path}")
 
-def save_channel_weights(cis_fitting, save_dir='results', file_name='channel_weights.xlsx'):
+def save_channel_importances(cis_fitting, save_dir='results', file_name='channel_importances.xlsx'):
     """
     将包含多个 DataFrame 的字典保存为一个 Excel 文件，不同的 sheet 存储不同的 DataFrame。
 
@@ -803,7 +803,7 @@ def save_channel_weights(cis_fitting, save_dir='results', file_name='channel_wei
             # 写入sheet
             data.to_excel(writer, sheet_name=valid_sheet_name, index=False)
 
-    print(f"Channel weights successfully saved to {save_path}")
+    print(f"Channel importances successfully saved to {save_path}")
 
 # %% Usage
 if __name__ == '__main_':
@@ -841,7 +841,7 @@ if __name__ == '__main_':
     path_currebt = os.getcwd()
     results_path = os.path.join(os.getcwd(), 'fitting_results')
     save_fitting_results(results, results_path, f'fitting_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
-    save_channel_weights(cws_sorted, results_path, f'channel_weights({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    save_channel_importances(cws_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
     
     # %% Validation of Fitting Comparison
     pltlabels = {'title':'Comparison of Fitted Channel Importances across various Models',
