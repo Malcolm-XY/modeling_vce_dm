@@ -200,186 +200,186 @@ class FittingConfig:
         return lambda p: {name: p[i] for i, name in enumerate(param_names)}
 
     config_basic_model_differ_recovery = {
-        'exponential': {
+        'Exponential': {
             'param_names': ['sigma'],
             'bounds': [(0.1, 20.0)],
         },
-        'gaussian': {
+        'Gaussian': {
             'param_names': ['sigma'],
             'bounds': [(0.1, 20.0)],
         },
-        'inverse': {
+        'Inverse': {
             'param_names': ['sigma', 'alpha'],
             'bounds': [(0.1, 20.0), (0.1, 5.0)],
         },
-        'powerlaw': {
+        'Power_Law': {
             'param_names': ['alpha'],
             'bounds': [(0.1, 10.0)],
         },
-        'rational_quadratic': {
+        'Rational_Quadratic': {
             'param_names': ['sigma', 'alpha'],
             'bounds': [(0.1, 20.0), (0.1, 10.0)],
         },
-        'generalized_gaussian': {
+        'Generalized_Gaussian': {
             'param_names': ['sigma', 'beta'],
             'bounds': [(0.1, 20.0), (0.1, 5.0)],
         },
-        'sigmoid': {
+        'Sigmoid': {
             'param_names': ['mu', 'beta'],
             'bounds': [(0.1, 10.0), (0.1, 5.0)],
         },
     }
 
     config_advanced_model_differ_recovery = {
-        'exponential': {
+        'Exponential': {
             'param_names': ['sigma', 'deviation', 'offset'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'gaussian': {
+        'Gaussian': {
             'param_names': ['sigma', 'deviation', 'offset'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'inverse': {
+        'Inverse': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
         },
-        'powerlaw': {
+        'Power_Law': {
             'param_names': ['alpha', 'deviation', 'offset'],
             'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0)],
         },
-        'rational_quadratic': {
+        'Rational_Quadratic': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'generalized_gaussian': {
+        'Generalized_Gaussian': {
             'param_names': ['sigma', 'beta', 'deviation', 'offset'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
         },
-        'sigmoid': {
+        'Sigmoid': {
             'param_names': ['mu', 'beta', 'deviation', 'offset'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
     }
 
     config_basic_model_linear_recovery = {
-        'exponential': {
+        'Exponential': {
             'param_names': ['sigma', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0)],
         },
-        'gaussian': {
+        'Gaussian': {
             'param_names': ['sigma', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0)],
         },
-        'inverse': {
+        'Inverse': {
             'param_names': ['sigma', 'alpha', 'scale_a'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
         },
-        'powerlaw': {
+        'Power_Law': {
             'param_names': ['alpha', 'scale_a'],
             'bounds': [(0.1, 10.0), (-1.0, 1.0)],
         },
-        'rational_quadratic': {
+        'Rational_Quadratic': {
             'param_names': ['sigma', 'alpha', 'scale_a'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0)],
         },
-        'generalized_gaussian': {
+        'Generalized_Gaussian': {
             'param_names': ['sigma', 'beta', 'scale_a'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
         },
-        'sigmoid': {
+        'Sigmoid': {
             'param_names': ['mu', 'beta', 'scale_a'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0)],
         },
     }
 
     config_advanced_model_linear_recovery = {
-        'exponential': {
+        'Exponential': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'gaussian': {
+        'Gaussian': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'inverse': {
+        'Inverse': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'powerlaw': {
+        'Power_Law': {
             'param_names': ['alpha', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'rational_quadratic': {
+        'Rational_Quadratic': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'generalized_gaussian': {
+        'Generalized_Gaussian': {
             'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
-        'sigmoid': {
+        'Sigmoid': {
             'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
     }
 
     config_basic_model_linear_ratio_recovery = {
-        'exponential': {
+        'Exponential': {
             'param_names': ['sigma', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'gaussian': {
+        'Gaussian': {
             'param_names': ['sigma', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'inverse': {
+        'Inverse': {
             'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'powerlaw': {
+        'Power_Law': {
             'param_names': ['alpha', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'rational_quadratic': {
+        'Rational_Quadratic': {
             'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'generalized_gaussian': {
+        'Generalized_Gaussian': {
             'param_names': ['sigma', 'beta', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'sigmoid': {
+        'Sigmoid': {
             'param_names': ['mu', 'beta', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
         },
     }
 
     config_advanced_model_linear_ratio_recovery = {
-        'exponential': {
+        'Exponential': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'gaussian': {
+        'Gaussian': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'inverse': {
+        'Inverse': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'powerlaw': {
+        'Power_Law': {
             'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'rational_quadratic': {
+        'Rational_Quadratic': {
             'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'generalized_gaussian': {
+        'Generalized_Gaussian': {
             'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
-        'sigmoid': {
+        'Sigmoid': {
             'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
@@ -431,7 +431,7 @@ def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, di
             print(f"[{method.upper()}] Optimization failed: {e}")
             results[method], cis_fitting[method] = None, None
 
-    print("\n=== Fitting Results of All Models (Minimum MSE) ===")
+    print("\n=== Fitted Results of All Models (Minimum MSE) ===")
     for method, result in results.items():
         if result is not None:
             print(f"[{method.upper()}] Best Parameters: {result['params']}, Minimum MSE: {result['loss']:.6f}")
@@ -439,6 +439,120 @@ def fitting_model(model_type='basic', recovery_type='differ', ci_target=None, di
             print(f"[{method.upper()}] Optimization Failed.")
 
     return results, cis_fitting
+
+from collections import OrderedDict
+import os
+def fitting_model_best(model_type='basic', recovery_type='differ',
+                       ci_target=None, distance_matrix=None, connectivity_matrix=None, N_TRIALS=5):
+    """
+    上位函数：循环运行 fitting_model，并输出试次内最佳优化结果（最低loss）。
+    同时保留所有试次的完整结果。
+
+    Args:
+        model_type (str): 'basic' or 'advanced'
+        recovery_type (str): 'differ', 'linear', 'linear_ratio'
+        ci_target (np.ndarray): Target feature vector
+        distance_matrix (np.ndarray): Distance matrix
+        connectivity_matrix (np.ndarray): Connectivity matrix
+
+    Returns:
+        results_best (dict): 每个方法的最佳参数与loss（最低loss试次）
+        cis_best (dict): 每个方法的最佳CI（与results_best对应）
+        results_all (list): 所有试次的results列表
+        cis_all (list): 所有试次的cis_fitting列表
+    """
+    # ====== 多次运行 fitting_model ======
+    trial_results_list = []
+    trial_cis_list = []
+
+    for t in range(N_TRIALS):
+        print(f"\n==== Trial {t+1}/{N_TRIALS} ====")
+        res_t, cis_t = fitting_model(
+            model_type=model_type,
+            recovery_type=recovery_type,
+            ci_target=ci_target,
+            distance_matrix=distance_matrix,
+            connectivity_matrix=connectivity_matrix
+        )
+        trial_results_list.append(res_t)
+        trial_cis_list.append(cis_t)
+
+    # ====== 汇总方法名 ======
+    method_names = OrderedDict()
+    for res_t in trial_results_list:
+        for m in (res_t.keys() if res_t is not None else []):
+            method_names[m] = True
+    method_names = list(method_names.keys())
+
+    results_best = OrderedDict()
+    cis_best = OrderedDict()
+
+    # ====== 选出各方法的最佳试次 ======
+    for m in method_names:
+        all_params, all_loss, all_ci = [], [], []
+
+        for res_t, cis_t in zip(trial_results_list, trial_cis_list):
+            if res_t is not None and m in res_t and res_t[m] is not None:
+                all_params.append(res_t[m]['params'])
+                all_loss.append(res_t[m]['loss'])
+            else:
+                all_params.append(None)
+                all_loss.append(np.inf)
+
+            if cis_t is not None and m in cis_t:
+                all_ci.append(cis_t[m])
+            else:
+                all_ci.append(None)
+
+        if not all_loss or all(np.isinf(all_loss)):
+            results_best[m] = {
+                'params': None,
+                'loss': None,
+                'params_trials': all_params,
+                'loss_trials': all_loss,
+                'ci_trials': all_ci,
+                'best_index': None,
+            }
+            cis_best[m] = None
+            continue
+
+        # 最小loss索引
+        best_idx = int(np.argmin(all_loss))
+        best_params = all_params[best_idx]
+        best_loss = all_loss[best_idx]
+        best_ci = all_ci[best_idx]
+
+        # 存储最佳试次数据
+        results_best[m] = {
+            'params': best_params,
+            'loss': best_loss,
+        }
+        cis_best[m] = best_ci
+
+    # ====== 返回结构 ======
+    cis_all = {}
+    for trial in trial_cis_list:
+        for key, ci_value in trial.items():
+            if key not in cis_all:
+                cis_all[key] = []
+            cis_all[key].append(ci_value)
+    
+    # 循环结束后再进行堆叠
+    for key in cis_all:
+        valid_ci = [ci for ci in cis_all[key] if ci is not None]
+        if len(valid_ci) > 0:
+            cis_all[key] = np.vstack(valid_ci)
+        else:
+            cis_all[key] = None
+    
+    results_all = {}
+    for trial in trial_results_list:
+        for key, result_value in trial.items():
+            if key not in results_all:
+                results_all[key] = []
+            results_all[key].append(result_value)
+
+    return results_best, cis_best, results_all, cis_all
 
 # %% Sort
 def sort_ams(ams, labels, original_labels=None):
@@ -457,6 +571,27 @@ def sort_ams(ams, labels, original_labels=None):
     dict_ams_summary = pd.concat([dict_ams_summary, dict_ams_sorted], axis=1)
     
     return dict_ams_summary
+
+def process_optimized_channel_importances(
+    cis_fitted_with_initial_reference: dict,
+    channel_manual_remove: list,
+) -> tuple[dict, dict]:
+    # 原始通道顺序
+    electrodes_original = np.array(utils_feature_loading.read_distribution('seed')['channel'])
+
+    cis_fitted, cis_sorted = {}, {}
+
+    # 逐方法处理
+    for method, ci_fitted in cis_fitted_with_initial_reference.items():
+        ci_fitted_temp = feature_engineering.insert_idx_manual(
+            ci_fitted, channel_manual_remove, value=0
+        )
+        cis_fitted[method] = ci_fitted_temp
+
+        ci_sorted_temp = sort_ams(ci_fitted_temp, electrodes_original, electrodes_original)
+        cis_sorted[method] = ci_sorted_temp
+
+    return cis_fitted, cis_sorted
 
 # %% Visualization
 # scatter
@@ -488,111 +623,369 @@ def draw_scatter_comparison(x, A, B, pltlabels={'title':'title',
     plt.tight_layout()
     plt.show()
 
-def draw_scatter_multi_method(x, A, fittings_dict, pltlabels=None, save_path=None):
+from itertools import cycle
+def draw_scatter_multi_method(x, A, fitted_dict, 
+                              pltlabels=None, save_path=None,
+                              rotate_xticks=60,
+                              freeze_style_indices=None,   # 原始顺序冻结索引
+                              ):
     """
-    在同一张图中绘制目标通道权重与多个拟合结果的比较图。
-
-    Args:
-        x (array-like): 横轴标签（如电极名或编号）
-        A: target (array-like): 目标通道权重
-        fittings_dict (dict): {method_name: ci_fitting_array}
-        pltlabels (dict): {'title': str, 'label_x': str, 'label_y': str, 'label_target': str}
-        save_path (str or None): 若指定路径则保存图像（如 'figs/ci_comparison.pdf'）
+    - 样式冻结在排序前执行：根据输入字典的原始顺序索引确定；
+    - 冻结项不会参与样式循环；
     """
-    # 默认标签
+    # ---- labels ----
     if pltlabels is None:
-        pltlabels = {'title': 'Comparison of Channel Importances across various Models',
-                     'label_x': 'Electrodes', 'label_y': 'Channel Importance',
-                     'label_A': 'target', 'label_B': 'label_B'}
+        pltlabels = dict(
+            title='Channel Importances Inferred from Optimized Models',
+            label_x='', # label_x='Channels',
+            label_y='Channel Importance',
+            label_A='Reference',
+        )
+    title   = pltlabels.get('title', 'Channel Importances Inferred from Optimized Models')
+    label_x = pltlabels.get('label_x', '') #     label_x = pltlabels.get('label_x', 'Channels')
+    label_y = pltlabels.get('label_y', 'Channel Importance')
+    label_A = pltlabels.get('label_A', 'Reference')
 
-    # 提取标签
-    title = pltlabels.get('title', '')
-    label_x = pltlabels.get('label_x', '')
-    label_y = pltlabels.get('label_y', '')
-    label_A = pltlabels.get('label_A', '')
-    label_B = pltlabels.get('label_B', '')
+    # ---- data ----
+    x = np.asarray(x)
+    A = np.asarray(A, dtype=float)
+    n = len(x)
+    if A.shape[0] != n:
+        raise ValueError("x 与 A 长度不一致")
 
-    # 绘图
-    plt.figure(figsize=(10, 4))
-    plt.plot(x, A, label=label_A, linestyle='-', marker='o', color='black')
+    # ---- 根据原始顺序标记冻结 ----
+    frozen_methods = set()
+    keys = list(fitted_dict.keys())
+    if freeze_style_indices:
+        for idx_raw in freeze_style_indices:
+            idx_resolved = idx_raw if idx_raw >= 0 else len(keys) + idx_raw
+            if 0 <= idx_resolved < len(keys):
+                frozen_methods.add(keys[idx_resolved])
 
-    # 绘制多个拟合曲线
-    for method, B in fittings_dict.items():
-        mse = mean_squared_error(A, B)
-        label_B = f"{method} (MSE={mse:.4f})"
-        plt.plot(x, B, label=label_B, linestyle='--', marker='x')  # 颜色自动分配
+    # ---- 计算 MSE 并排序 ----
+    stats = []
+    for method, B in fitted_dict.items():
+        B = np.asarray(B, dtype=float)
+        if B.shape[0] != n:
+            raise ValueError(f"{method} 的长度与 x 不一致")
+        mse = float(np.mean((A - B) ** 2))
+        stats.append((method, mse, B))
+    stats.sort(key=lambda t: t[1])
 
-    # 图形设置
-    plt.title(title)
-    plt.xlabel(label_x)
-    plt.ylabel(label_y)
-    plt.xticks(rotation=60)
-    plt.tick_params(axis='x', labelsize=8)
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
+    # ---- 画布 ----
+    W = max(10.0, 0.6 * (n / 10))
+    H = 4.8
+    fig, ax = plt.subplots(figsize=(W, H))
 
-    # 保存或显示
+    # ---- 目标曲线 ----
+    idx = np.arange(n)
+    ax.plot(
+        idx, A,
+        label=f"{label_A}",
+        linestyle='-',
+        marker='o',
+        linewidth=1.6,
+        markersize=4.0,
+        markevery=2,
+    )
+    
+    # ---- 冻结曲线 ----
+    for _, (method, mse, B) in enumerate(stats):
+        if method in frozen_methods:    
+            ax.plot(
+                idx, B,
+                label=f"{method} (MSE={mse:.4f})",
+                linestyle='-',
+                marker='o',
+                linewidth=1.6,
+                markersize=4.0,
+                markevery=2,
+            )
+
+    # ---- 样式循环 ----
+    line_styles = cycle(['--', '-.', ':'])
+    markers = cycle(['x', 'v', '^', 's', 'D', 'P'])
+
+    # ---- 绘制模型曲线 ----
+    for rank, (method, mse, B) in enumerate(stats):
+        if method not in frozen_methods:
+            ls = next(line_styles)
+            mk = next(markers)
+
+            ax.plot(
+                idx, B,
+                label=f"{method} (MSE={mse:.4f})" + (" (best)" if rank == 0 else ""),
+                linestyle=ls,
+                marker=mk,
+                linewidth=1.2,
+                markersize=3.5 if mk is not None else 0,
+                alpha=0.9,
+                markevery=2,
+            )
+
+    # ---- 坐标 & 网格 ----
+    ax.set_title(title, pad=10)
+    ax.set_xlabel(label_x)
+    ax.set_ylabel(label_y)
+    ax.set_xticks(idx)
+    ax.set_xticklabels(x, rotation=rotate_xticks, ha='right')
+    ax.tick_params(axis='x', labelsize=8)
+
+    ax.grid(axis='y', linestyle=':', linewidth=0.8)
+    ax.grid(axis='x', which='major', linestyle=':', linewidth=0.5)
+
+    # ---- 图例 ----
+    handles, labels = ax.get_legend_handles_labels()
+    ncols = 3 if len(handles) > 6 else 2
+    plt.subplots_adjust(bottom=0.22)
+    fig.legend(
+        handles, labels,
+        loc='lower center',
+        bbox_to_anchor=(0.5, -0.05),
+        frameon=True,
+        framealpha=0.9,
+        ncol=ncols,
+        title="Models (sorted by MSE)",
+    )
+
     if save_path:
-        plt.savefig(save_path, dpi=300)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"[INFO] 图像已保存到 {save_path}")
+        plt.close(fig)
     else:
         plt.show()
 
-def draw_scatter_subplots_vertical(x, A, fittings_dict, pltlabels=None, save_path=None):
+from matplotlib import cm
+from sklearn.manifold import TSNE
+import matplotlib.patheffects as pe
+def draw_tsne(
+    cis_dict,
+    perplexity: int = 5,
+    random_state: int = 42,
+    n_iter: int = 2000,
+    figsize=(8, 6),
+    k_neighbors_for_label: int = 5,
+    adjust_kwargs: dict | None = None,
+):
     """
-    绘制目标通道权重与多个拟合方法的对比子图（单列多行），适用于论文展示。
+    可视化不同模型的 CI 样本在 t-SNE 平面上的分布，并且：
+      1) 使用 K 近邻平均距离最小的真实点作为模型“聚集地”代表点（避免用欧式中点）；
+      2) 在代表点附近自动布置模型名称标签，使用 adjustText 智能防重叠；
+      3) 图例放在图像下方居中，且顺序与输入 dict 保持一致。
 
     Args:
-        x (array-like): 横轴坐标（如电极标签）
-        A: target (array-like): 目标通道权重
-        fittings_dict (dict): {method_name: ci_fitting_array}
-        pltlabels (dict): {'title': str, 'label_x': str, 'label_y': str, 'label_target': str}
-        save_path (str or None): 若指定路径则保存图像（如 'figs/ci_subplot.pdf'）
+        cis_dict (dict): {model_name: np.ndarray(n_samples, n_features)}
+        perplexity (int): t-SNE perplexity
+        random_state (int): 随机种子
+        n_iter (int): t-SNE 迭代次数
+        figsize (tuple): 图尺寸
+        k_neighbors_for_label (int): 选择代表点时的 K 值（KNN 平均距离最小）
+        adjust_kwargs (dict|None): 传给 adjustText.adjust_text 的可选参数
     """
-    if pltlabels is None:
-        pltlabels = {'title': 'Comparison of Channel Weights across various Models',
-                     'label_x': 'Electrodes', 'label_y': 'Channel Weight',
-                     'label_A': 'target', 'label_B': 'label_B'}
+    # ====== 依赖检查 ======
+    try:
+        from adjustText import adjust_text
+    except Exception as e:
+        raise ImportError(
+            "本函数需要依赖 adjustText 以实现标签自动防重叠，请先安装：\n"
+            "    pip install adjustText\n"
+            f"原始错误：{e}"
+        )
 
-    label_x = pltlabels.get('label_x', '')
-    label_y = pltlabels.get('label_y', '')
-    label_A = pltlabels.get('label_A', '')
-    label_B = pltlabels.get('label_B', '')
-    suptitle = pltlabels.get('title', '')
+    if not cis_dict:
+        raise ValueError("cis_dict is empty — cannot perform t-SNE projection.")
 
-    methods = list(fittings_dict.keys())
-    n_methods = len(methods)
+    # ====== 保持输入顺序 ======
+    models = list(cis_dict.keys())
 
-    fig, axes = plt.subplots(nrows=n_methods, ncols=1, figsize=(10, 2.5 * n_methods), sharex=True)
+    # ====== 准备数据与标签 ======
+    all_samples, all_labels = [], []
+    for model in models:
+        data = cis_dict[model]
+        if data is None:
+            continue
+        data = np.asarray(data)
+        if data.ndim == 1:
+            data = data[np.newaxis, :]
+        if data.size == 0:
+            continue
+        all_samples.append(data)
+        all_labels += [model] * data.shape[0]
 
-    if n_methods == 1:
-        axes = [axes]  # 保证可迭代性
+    if not all_samples:
+        raise ValueError("No valid CI data found.")
 
-    for ax, method in zip(axes, methods):
-        B = fittings_dict[method]
-        mse = mean_squared_error(A, B)
+    data_all = np.vstack(all_samples)
+    label_all = np.array(all_labels)
 
-        ax.plot(x, A, label=label_A, linestyle='-', marker='o', color='black')
-        label_B = f'CI of RCM; FM model: {method} (MSE={mse:.4f})'
-        ax.plot(x, B, label=label_B, linestyle='--', marker='x')
+    # perplexity 安全调整
+    if data_all.shape[0] <= perplexity:
+        perplexity = max(1, data_all.shape[0] - 1)
 
-        ax.set_ylabel(label_y)
-        ax.grid(True)
-        ax.legend(loc='best', fontsize=8)
+    # ====== t-SNE ======
+    tsne = TSNE(
+        n_components=2,
+        perplexity=perplexity,
+        random_state=random_state,
+        n_iter=n_iter,
+        init="pca",
+        learning_rate="auto"
+    )
+    tsne_result = tsne.fit_transform(data_all)
 
-    # 只设置最后一张图的 x label
-    axes[-1].set_xlabel(label_x)
-    axes[-1].tick_params(axis='x', labelrotation=60, labelsize=8)
+    # ====== 绘图 ======
+    fig, ax = plt.subplots(figsize=figsize)
 
-    fig.suptitle(suptitle, fontsize=14)
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    # 使用输入顺序（而非排序）
+    unique_models = [m for m in models if m in label_all]
+    cmap = cm.get_cmap("tab10", len(unique_models))
+    color_map = {model: cmap(i) for i, model in enumerate(unique_models)}
 
-    if save_path:
-        plt.savefig(save_path, dpi=300)
-        print(f"[INFO] 子图已保存到 {save_path}")
-    else:
-        plt.show()
+    plotted_handles, plotted_labels = [], []
+    texts = []           # 保存 text 对象，供 adjust_text 自动调整
+    anchor_points = []   # 对齐的锚点坐标（可用于调参）
+
+    # ====== 逐模型绘制点云并选代表点 ======
+    for model in unique_models:
+        idx = (label_all == model)
+        pts = tsne_result[idx]  # shape: (n_i, 2)
+
+        sc = ax.scatter(
+            pts[:, 0], pts[:, 1],
+            label=model, c=[color_map[model]],
+            s=70, alpha=0.75, edgecolors='k', linewidths=0.7
+        )
+        plotted_handles.append(sc)
+        plotted_labels.append(model)
+
+        # 代表点：KNN 平均距离最小（密度最高）
+        n_i = pts.shape[0]
+        if n_i == 1:
+            anchor_xy = pts[0]
+        else:
+            K = max(1, min(k_neighbors_for_label, n_i - 1))
+            diffs = pts[:, None, :] - pts[None, :, :]
+            dists = np.sqrt(np.sum(diffs**2, axis=2))          # (n_i, n_i)
+            order = np.argsort(dists, axis=1)
+            knn_mean = np.array([dists[r, order[r, 1:K+1]].mean() for r in range(n_i)])
+            anchor_idx = int(np.argmin(knn_mean))
+            anchor_xy = pts[anchor_idx]
+
+        # 锚点高亮
+        ax.scatter(
+            anchor_xy[0], anchor_xy[1],
+            marker='X', s=140, c=[color_map[model]],
+            edgecolors='black', linewidths=1.0, zorder=5
+        )
+
+        # 初始把文字放在锚点位置，让 adjustText 自动“挪开”
+        txt = ax.text(
+            anchor_xy[0], anchor_xy[1],
+            model,
+            fontsize=10, weight='bold', ha='center', va='center',
+            path_effects=[pe.withStroke(linewidth=3, foreground='white')],
+            zorder=6
+        )
+        texts.append(txt)
+        anchor_points.append(anchor_xy)
+
+    # ====== 坐标轴与网格 ======
+    ax.set_title("t-SNE Projection of Channel Importances by Model", fontsize=13, fontweight='bold')
+    ax.set_xlabel("t-SNE Dimension 1")
+    ax.set_ylabel("t-SNE Dimension 2")
+    ax.grid(True, linestyle='--', alpha=0.3)
+
+    # ====== 自动防重叠（带箭头） ======
+    # 默认参数：适度的排斥力与迭代次数；可通过 adjust_kwargs 覆盖
+    default_adjust = dict(
+        ax=ax,
+        arrowprops=dict(arrowstyle='-', lw=0.6, color='gray', alpha=0.9),
+        expand_text=(1.05, 1.15),
+        expand_points=(1.05, 1.15),
+        force_points=0.5,
+        force_text=0.5,
+        only_move={'points':'', 'text':'xy'},
+        lim=300
+    )
+    if adjust_kwargs:
+        default_adjust.update(adjust_kwargs)
+    # 调整文本位置以避免重叠；若文字移动，将自动从移动后的文字画箭头指回原始锚点
+    adjust_text(texts, **default_adjust)
+
+    # ====== 图例下方居中，遵从输入顺序 ======
+    ncol = min(len(unique_models), 6)
+    fig.legend(
+        plotted_handles, plotted_labels,
+        loc='lower center', ncol=ncol, frameon=True, title="Model",
+        bbox_to_anchor=(0.5, -0.02)
+    )
+
+    # 为底部图例留白，并让 tight_layout 不覆盖底部区域
+    plt.tight_layout(rect=(0, 0.08, 1, 1))
+    plt.show()
+
+def draw_tsne_(cis_dict, perplexity: int = 5, random_state: int = 42, n_iter: int = 2000, figsize=(8, 6)):
+    """
+    Visualize CI samples from different models using t-SNE projection.
+    """
+    if not cis_dict:
+        raise ValueError("cis_dict is empty — cannot perform t-SNE projection.")
+
+    models = list(cis_dict.keys())
+
+    # ========= Prepare Data and Labels =========
+    all_samples = []
+    all_labels = []
+
+    for model in models:
+        data = cis_dict[model]
+        if data is None:
+            continue
+        if data.ndim == 1:
+            data = data[np.newaxis, :]  # handle (n_features,) case
+
+        all_samples.append(data)
+        all_labels += [model] * data.shape[0]
+
+    if not all_samples:
+        raise ValueError("No valid CI data found.")
+
+    data_all = np.vstack(all_samples)
+    label_all = np.array(all_labels)
+
+    if data_all.shape[0] <= perplexity:
+        perplexity = max(1, data_all.shape[0] - 1)
+
+    # ========= t-SNE =========
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=random_state, n_iter=n_iter)
+    tsne_result = tsne.fit_transform(data_all)
+
+    # ========= Plotting =========
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # 保留输入顺序，不排序
+    unique_models = [m for m in models if m in label_all]
+
+    cmap = cm.get_cmap("tab10", len(unique_models))
+    color_map = {model: cmap(i) for i, model in enumerate(unique_models)}
+
+    for model in unique_models:
+        idx = label_all == model
+        ax.scatter(tsne_result[idx, 0], tsne_result[idx, 1],
+                   label=model, c=[color_map[model]], s=70, alpha=0.75, edgecolors='k')
+
+    ax.set_title("t-SNE Projection of Channel Importances by Model", fontsize=13, fontweight='bold')
+    ax.set_xlabel("t-SNE Dimension 1")
+    ax.set_ylabel("t-SNE Dimension 2")
+
+    # 按输入顺序生成图例
+    handles, labels = ax.get_legend_handles_labels()
+    ordered_handles = [handles[unique_models.index(lbl)] for lbl in labels]
+    ax.legend(ordered_handles, unique_models, title="Model", loc='best', frameon=True)
+
+    ax.grid(True, linestyle='--', alpha=0.3)
+    plt.tight_layout()
+    plt.show()
 
 # topography
 import mne
@@ -732,7 +1125,8 @@ def plot_joint_topomaps(
         # 绘图到指定子图
         mne.viz.plot_topomap(evoked.data[:, 0], evoked.info, axes=ax,
                              show=False, cmap='viridis', sphere=(0., 0., 0., 1.1))
-        ax.set_title(method, fontsize=12)
+        # ax.set_title(method, fontsize=12)
+        ax.set_xlabel(method, fontsize=12)
 
     # 关闭多余子图
     for i in range(num_plots, len(axes)):
@@ -740,14 +1134,14 @@ def plot_joint_topomaps(
 
     fig.suptitle(title, fontsize=16)
     plt.tight_layout()
-    plt.subplots_adjust(top=0.92)
+    # plt.subplots_adjust(top=0.92)
     plt.show()
 
 # %% Save
 import os
-def save_fitting_results(results, save_dir='results', file_name='fitting_results.xlsx'):
+def save_fitted_results(results, save_dir='results', file_name='fitted_results.xlsx'):
     """
-    Save fitting results (parameters and losses) into an Excel or TXT file.
+    Save fitted results (parameters and losses) into an Excel or TXT file.
     """
     os.makedirs(save_dir, exist_ok=True)
     results_path = os.path.join(save_dir, file_name)
@@ -772,14 +1166,14 @@ def save_fitting_results(results, save_dir='results', file_name='fitting_results
     else:
         raise ValueError("Unsupported file extension. Use .xlsx or .txt")
 
-    print(f"Fitting results saved to {results_path}")
+    print(f"Fitted results saved to {results_path}")
 
-def save_channel_importances(cis_fitting, save_dir='results', file_name='channel_importances.xlsx'):
+def save_channel_importances(cis_fitted, save_dir='results', file_name='channel_importances.xlsx'):
     """
     将包含多个 DataFrame 的字典保存为一个 Excel 文件，不同的 sheet 存储不同的 DataFrame。
 
     Args:
-        cis_fitting (dict): 键是 sheet 名，值是 DataFrame 或可以转换成 DataFrame 的数据结构。
+        cis_fitted (dict): 键是 sheet 名，值是 DataFrame 或可以转换成 DataFrame 的数据结构。
         save_dir (str): 保存目录，默认为 'results'。
         file_name (str): 保存的文件名，默认为 'channel_weights.xlsx'。
     """
@@ -792,7 +1186,7 @@ def save_channel_importances(cis_fitting, save_dir='results', file_name='channel
 
     # 写入Excel
     with pd.ExcelWriter(save_path, engine='openpyxl') as writer:
-        for sheet_name, data in cis_fitting.items():
+        for sheet_name, data in cis_fitted.items():
             # 安全处理sheet名：截断长度，替换非法字符
             valid_sheet_name = sheet_name[:31].replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace(':', '_').replace('[', '_').replace(']', '_')
 
@@ -806,70 +1200,54 @@ def save_channel_importances(cis_fitting, save_dir='results', file_name='channel
     print(f"Channel importances successfully saved to {save_path}")
 
 # %% Usage
-if __name__ == '__main_':
+if __name__ == '__main__':
     # Fittin target and DM
-    channel_manual_remove = [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
-    electrodes, ci_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
+    channel_manual_remove = [] # [57, 61] # or # channel_manual_remove = [57, 61, 58, 59, 60]
+    electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc',
                                                     'label_driven_mi_1_5', channel_manual_remove)
     
-    # or # electrodes, ci_target, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
+    # or # electrodes, ci_reference, distance_matrix, cm_global_averaged = prepare_target_and_inputs('pcc', 
     #                                                 'label_driven_mi', channel_manual_remove)
     
     # %% Fitting
     fm_model, rcm_model = 'advanced', 'linear_ratio' # 'basic', 'advanced'; 'differ', 'linear', 'linear_ratio'
-    results, cis_fitting = fitting_model(fm_model, rcm_model, ci_target, distance_matrix, cm_global_averaged)
+    # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     
-    # %% Insert target cw (LDMI) and cm ci non modeled
-    ci_non_modeled = np.mean(cm_global_averaged, axis=0)
-    ci_non_modeled = feature_engineering.normalize_matrix(ci_non_modeled)
+    results_best, cis_best, _, cis_all = fitting_model_best(fm_model, rcm_model, 
+                                                                      ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=10)
     
-    cis_fitting = {'target': ci_target,'non_modeled': ci_non_modeled, **cis_fitting}
+    # %% Insert reference (LDMI) and initial ci (CM)
+    ci_initial_model = np.mean(cm_global_averaged, axis=0)
+    ci_initial_model = feature_engineering.normalize_matrix(ci_initial_model)
     
-    # %% Sort ranks of channel weights based on fitted models
-    # electrodes
-    electrodes_original = np.array(utils_feature_loading.read_distribution('seed')['channel'])
+    cis_fitted_with_initial = {'Initial_Model': ci_initial_model, **cis_best}
+    cis_fitted_with_reference = {'Reference': ci_reference, **cis_best}
+    cis_fitted_with_initial_reference = {'Reference': ci_reference, **cis_fitted_with_initial}
+    cis_all_with_initial_reference = {'Reference': ci_reference, 'Initial_Model': ci_initial_model, **cis_all}
     
-    # fitted
-    cws_fitted, cws_sorted = {}, {}
-    for method, cw_fitted in cis_fitting.items():
-        cw_fitted_temp = feature_engineering.insert_idx_manual(cis_fitting[method], channel_manual_remove, value=0)
-        cws_fitted[method] = cw_fitted_temp
-        cw_sorted_temp = sort_ams(cw_fitted_temp, electrodes_original, electrodes_original)
-        cws_sorted[method] = cw_sorted_temp
+    # %% Sort ranks of channel importances based on fitted models
+    _, cis_sorted = process_optimized_channel_importances(cis_fitted_with_initial_reference, channel_manual_remove)
     
     # %% Save
     path_currebt = os.getcwd()
-    results_path = os.path.join(os.getcwd(), 'fitting_results')
-    save_fitting_results(results, results_path, f'fitting_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
-    save_channel_importances(cws_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    results_path = os.path.join(os.getcwd(), 'fitted_results')
+    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
     
-    # %% Validation of Fitting Comparison
-    pltlabels = {'title':'Comparison of Fitted Channel Importances across various Models',
-                 'label_x':'Electrodes', 'label_y':'Channel Importance', 
-                 'label_A':'CI of target: LD MI', 'label_B':'CI of RCM; by Modeled FM'}
-    
-    # plot by list
-    # pltlabels_non_modeled = pltlabels.copy()
-    # pltlabels_non_modeled['title'] = 'Comparison of CWs; Before Modeling'
-    # draw_scatter_comparison(electrodes, cw_target, cw_non_modeled, pltlabels_non_modeled)
-
-    # for method, cw_fitting in cws_fitting.items():
-    #     _pltlabels = pltlabels.copy()
-    #     _pltlabels['title'] = f'Comparison of CWs; {method}'
-    #     _pltlabels['label_B'] = 'CW_Recovered_CM_PCC(Fitted)'
-    #     draw_scatter_comparison(electrodes, cw_target, cw_fitting, _pltlabels)
-    
+    # %% Validation of Fitted Comparison
     # joint scatter
-    draw_scatter_multi_method(electrodes, ci_target, cis_fitting, pltlabels)
+    draw_scatter_multi_method(electrodes, ci_reference, cis_fitted_with_initial, freeze_style_indices=[0])
     
-    draw_scatter_subplots_vertical(electrodes, ci_target, cis_fitting, pltlabels)
+    draw_tsne(cis_fitted_with_initial_reference)
+    draw_tsne(cis_all_with_initial_reference)
     
     # %% Validation of Brain Topography
     # mne topography
+    _, cis_sorted = process_optimized_channel_importances(cis_fitted_with_reference, channel_manual_remove)
     distribution = utils_feature_loading.read_distribution('seed')
-    plot_joint_topomaps(amps_dict=cws_sorted, distribution_df=distribution, title="All Method Comparison")
+    plot_joint_topomaps(amps_dict=cis_sorted, distribution_df=distribution, 
+                        title="Topographic Distributions of Channel Importances Inferred from Optimized Models")
     
     # %% Validation of Heatmap
-    cis_fitting['ci_target'] = ci_target
-    utils_visualization.draw_joint_heatmap_1d(cis_fitting)
-    
+    utils_visualization.draw_joint_heatmap_1d(cis_fitted_with_initial_reference, 
+                                              title="Heatmap of Channel Importances Inferred from Optimized Models", xticklabels=electrodes)

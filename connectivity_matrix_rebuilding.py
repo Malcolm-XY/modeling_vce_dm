@@ -30,7 +30,7 @@ def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='b
     """
 
     # 参数验证
-    supported_models = ['exponential', 'gaussian', 'inverse', 'generalized_gaussian', 'powerlaw', 'rational_quadratic', 'sigmoid']
+    supported_models = ['exponential', 'gaussian', 'inverse', 'generalized_gaussian', 'power_law', 'rational_quadratic', 'sigmoid']
     if model not in supported_models:
         raise ValueError(f"Unsupported model: {model}")
     if model_fm not in ['basic', 'advanced']:

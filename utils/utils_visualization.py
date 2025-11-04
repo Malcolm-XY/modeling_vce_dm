@@ -43,22 +43,35 @@ def draw_heatmap_1d(data, yticklabels=None, figsize=(2, 10), title=None):
     plt.title(title)
     plt.show()
 
-def draw_joint_heatmap_1d(data_dict):
-    heatmap_labels = []
-    heatmap_data = []
-
-    for label, data in data_dict.items():
-        heatmap_labels.append(label)
-        heatmap_data.append(data)
-
-    heatmap_data = np.vstack(heatmap_data) 
-    heatmap_labels = np.array(heatmap_labels)
-        
+def draw_joint_heatmap_1d(data_dict, xticklabels=None, title="Heatmap of Channel Importances", cmap="viridis", xrot=60, yrot=0):
+    # --- Validate input ---
+    if not data_dict:
+        raise ValueError("data_dict cannot be empty.")
+    
+    # --- Prepare data ---
+    labels = list(data_dict.keys())
+    data = np.vstack(list(data_dict.values()))
+    
+    # --- Plot ---
     plt.figure(figsize=(14, 6))
-    sns.heatmap(heatmap_data, cmap='viridis', cbar=True, xticklabels=False, yticklabels=heatmap_labels, linewidths=0.5, linecolor='gray')
-    plt.title("Heatmap of cw_target and All cw_fitting Vectors")
-    plt.xlabel("Channel Index")
-    plt.ylabel("Model")
+    sns.heatmap(
+        data,
+        cmap=cmap,
+        cbar=True,
+        xticklabels=xticklabels if xticklabels is not None else False,
+        yticklabels=labels,
+        linewidths=0.5,
+        linecolor="gray"
+    )
+    
+    # --- Rotation settings ---
+    plt.xticks(rotation=xrot)
+    plt.yticks(rotation=yrot)
+    
+    # --- Labels and layout ---
+    plt.title(title, fontsize=14)
+    plt.xlabel("Channel Index", fontsize=12)
+    plt.ylabel("Model", fontsize=12)
     plt.tight_layout()
     plt.show()
 

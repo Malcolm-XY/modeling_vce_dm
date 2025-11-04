@@ -34,7 +34,7 @@ def compute_volume_conduction_factors_basic_model(_distance_matrix, method='expo
         'gaussian': {'sigma': 5.0},
         'inverse': {'sigma': 5.0, 'alpha': 2.0},
         'cutoff': {'threshold': 5.0, 'factor': 0.5},
-        'powerlaw': {'alpha': 2.0},
+        'power_law': {'alpha': 2.0},
         'rational_quadratic': {'sigma': 5.0, 'alpha': 1.0},
         'generalized_gaussian': {'sigma': 5.0, 'beta': 2.0},
         'sigmoid': {'mu': 5.0, 'beta': 1.0},
@@ -74,7 +74,7 @@ def compute_volume_conduction_factors_basic_model(_distance_matrix, method='expo
         factor = params['factor']
         factor_matrix = np.where(_distance_matrix < threshold, factor, 0.0)
 
-    elif method == 'powerlaw':
+    elif method == 'power_law':
         alpha = params['alpha']
         factor_matrix = 1.0 / (np.power(_distance_matrix, alpha) + epsilon)
 
@@ -127,23 +127,25 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, method='e
         'gaussian': {'sigma': 5.0, 'deviation': 0.0, 'offset': 0.0},
         'inverse': {'sigma': 5.0, 'alpha': 2.0, 'deviation': 0.0, 'offset': 0.0},
         'cutoff': {'threshold': 5.0, 'factor': 0.5, 'deviation': 0.0, 'offset': 0.0},
-        'powerlaw': {'alpha': 2.0, 'deviation': 0.0, 'offset': 0.0},
+        'power_law': {'alpha': 2.0, 'deviation': 0.0, 'offset': 0.0},
         'rational_quadratic': {'sigma': 5.0, 'alpha': 1.0, 'deviation': 0.0, 'offset': 0.0},
         'generalized_gaussian': {'sigma': 5.0, 'beta': 2.0, 'deviation': 0.0, 'offset': 0.0},
         'sigmoid': {'mu': 5.0, 'beta': 1.0, 'deviation': 0.0, 'offset': 0.0},
     }
-
-    if params is None:
-        if method in default_params:
-            params = default_params[method].copy()
-        else:
-            raise ValueError(f"未提供参数，且方法 '{method}' 没有默认参数")
-    elif method in default_params:
-        method_params = default_params[method].copy()
-        method_params.update(params)
-        params = method_params
-    else:
+    
+    method = method.lower()
+    
+    # 检查方法是否受支持
+    if method not in default_params:
         raise ValueError(f"不支持的建模方法: {method}")
+    
+    # 处理参数
+    if params is None:
+        # 若未提供参数，则使用默认参数
+        params = default_params[method].copy()
+    else:
+        # 若提供了参数，则在默认参数基础上更新
+        params = {**default_params[method], **params}
 
     # 通用参数
     deviation = params.get('deviation', 0.0)
@@ -172,7 +174,7 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, method='e
         factor = params['factor']
         factor_matrix = np.where(_d < threshold, factor + offset, offset)
 
-    elif method == 'powerlaw':
+    elif method == 'power_law':
         alpha = params['alpha']
         factor_matrix = 1.0 / (np.power(_d, alpha) + epsilon) + offset
 
