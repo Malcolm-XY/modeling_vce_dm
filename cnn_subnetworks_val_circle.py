@@ -236,7 +236,12 @@ def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "a
     # Compute mean of all numeric columns (excluding Identifier)
     mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
     mean_row['Identifier'] = 'Average'
-    df_results = pd.concat([df_results, pd.DataFrame([mean_row])], ignore_index=True)
+    
+    # Std
+    std_row = df_results.select_dtypes(include=[np.number]).std(ddof=0).to_dict()
+    std_row['Identifier'] = 'Std'
+    
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row, std_row])], ignore_index=True)
     
     # Save
     if save:
@@ -321,10 +326,11 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 
 # %% Execute
 if __name__ == '__main__':
-    selection_rate_list = [1, 0.75, 0.5, 0.3, 0.2, 0.2, 0.1, 0.05]
+    selection_rate_list = [1, 0.75, 0.5, 0.3] #, 0.2, 0.1, 0.05]
     
     for selection_rate in selection_rate_list:
-        cnn_subnetworks_eval_circle_rcm_intergrated(feature_cm='pcc', subject_range=range(6, 16), selection_rate=selection_rate, save=True)
+        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', model_rcm='linear_ratio', 
+                                                    feature_cm='pcc', subject_range=range(6, 16), selection_rate=selection_rate, save=True)
     
     # %% End
     from cnn_val_circle import end_program_actions
