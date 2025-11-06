@@ -1,20 +1,112 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Mar 26 17:30:25 2025
+Created on Thu Nov  6 19:54:49 2025
 
-@author: usouu
+@author: 18307
 """
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from scipy.ndimage import gaussian_filter
-from scipy.optimize import differential_evolution
-
 import feature_engineering
-import vce_modeling
-import ci_management
+
+# %%
+def apply_generalized_surface_laplacian_filtering(matrix, distance_matrix,
+                                                  filtering_params={
+                                                      'computation': 'generalized_surface_laplacian_filtering',
+                                                      'sigma': 0.1,
+                                                      'reinforce': False,
+                                                      'symmetrize': True,
+                                                      # 额外：加速/稀疏选项
+                                                      'knn': None,          # int 或 None：每行只保留 k 个最近邻
+                                                      'normalized': False    # True: 归一化(减加权平均)；False: 未归一化(减加权和)
+                                                      },
+                                                  visualize=False
+                                                  ):
+    """
+    向量化的 FN-Laplacian（边空间）实现：
+    M' = M - neighbor_avg
+    neighbor_avg(i,j) = [sum_v W[j,v] M[i,v] + sum_u W[i,u] M[u,j]] / [sum_v W[j,v] + sum_u W[i,u] - 2W[i,j]]
+    
+    若 normalized=False，则分母省略，直接用加权和（更贴近未归一化拉普拉斯）。
+    支持 knn 稀疏化以加速大规模 N。
+    """
+    if visualize:
+        try:
+            utils_visualization.draw_projection(matrix, 'Before FN-Laplacian Filtering (fast)')
+        except Exception:
+            pass
+
+    M = np.array(matrix, dtype=float, copy=True)
+    D = np.array(distance_matrix, dtype=float, copy=True)
+    N = M.shape[0]
+
+    sigma = float(filtering_params.get('sigma', 0.1))
+    reinforce = bool(filtering_params.get('reinforce', False))
+    symmetrize = bool(filtering_params.get('symmetrize', True))
+    knn = filtering_params.get('knn', None)
+    normalized = bool(filtering_params.get('normalized', True))
+
+    # 1) 保证对称/对角清零（FC 一般对称且对角应为 0）
+    M = 0.5 * (M + M.T)
+    np.fill_diagonal(M, 0.0)
+
+    # 2) 构造权重核 W = exp(-(D^2)/(2*sigma^2))，对角置 0
+    if sigma <= 0:
+        raise ValueError("sigma must be > 0.")
+    W = np.exp(- (D * D) / (2.0 * sigma * sigma))
+    np.fill_diagonal(W, 0.0)
+
+    # 3) 可选 kNN 稀疏化（每行只保留 k 个最大权重）
+    if knn is not None and isinstance(knn, int) and knn > 0 and knn < N-1:
+        # 对每一行，保留最大的 knn 个非对角元素
+        # 用 partition 实现 O(N) 选择，再零掉其余
+        idx = np.argpartition(W, -knn, axis=1)[:, -(knn):]   # 每行 top-k 的列索引（无序）
+        mask = np.zeros_like(W, dtype=bool)
+        row_indices = np.arange(N)[:, None]
+        mask[row_indices, idx] = True
+        # 保证对称性：取 mask 或其转置的并集（避免破坏 W 的对称）
+        mask = np.logical_or(mask, mask.T)
+        W = np.where(mask, W, 0.0)
+
+    # 4) 预计算行和
+    r = W.sum(axis=1)  # shape (N,)
+
+    # 5) 两次矩阵乘法（BLAS 加速）：A = M W,  B = W M
+    A = M @ W
+    B = W @ M
+
+    if normalized:
+        # 分子与分母
+        num = A + B
+        den = r[None, :] + r[:, None] - 2.0 * W  # shape (N,N)
+
+        # 避免除零：den<=eps 时，回退到 M 本身（等价于无邻居时不改变）
+        eps = 1e-12
+        neighbor_avg = np.where(den > eps, num / den, M)
+    else:
+        # 未归一化：使用加权和（对应你最初公式的“求和”版本）
+        neighbor_avg = A + B
+
+    # 6) 滤波：M' = M - neighbor_avg
+    M_filtered = M - neighbor_avg
+
+    # 7) 可选残差增强
+    if reinforce:
+        M_filtered = M_filtered + M  # 2M - neighbor_avg
+
+    # 8) 可选对称化
+    if symmetrize:
+        M_filtered = 0.5 * (M_filtered + M_filtered.T)
+
+    if visualize:
+        try:
+            utils_visualization.draw_projection(M_filtered, 'After FN-Laplacian Filtering (fast)')
+        except Exception:
+            pass
+
+    return M_filtered
 
 # %% Normalize and prune CI
 def prune_ci(ci, normalize_method='minmax', transform_method='boxcox'):
@@ -23,6 +115,7 @@ def prune_ci(ci, normalize_method='minmax', transform_method='boxcox'):
     return ci
 
 # %% Compute CM, get CI as Agent of GCM and RCM
+import ci_management
 from utils import utils_feature_loading, utils_visualization
 def preprocessing_cm_global_averaged(cm_global_averaged, coordinates):
     # Global averaged connectivity matrix; For subsquent fitting computation
@@ -101,14 +194,27 @@ def prepare_target_and_inputs(feature='pcc', ranking_method='label_driven_mi_1_5
     return electrodes, ci_target_smooth, distance_matrix, cm_global_averaged
 
 # Here utilized VCE Model/FM=M(DM) Model
+from scipy.ndimage import gaussian_filter
 def compute_ci_fitting(method, params_dict, distance_matrix, connectivity_matrix, RCM='differ'):
     """
     Compute ci_fitting based on selected RCM method: differ, linear, or linear_ratio.
     """
     RCM = RCM.lower()
-
+    
     # Step 1: Calculate FM
-    factor_matrix = vce_modeling.compute_volume_conduction_factors_advanced_model(distance_matrix, method, params_dict)
+    sigma = params_dict['sigma']
+    factor_matrix = apply_generalized_surface_laplacian_filtering(connectivity_matrix, distance_matrix,
+                                                      filtering_params={
+                                                          'computation': 'generalized_surface_laplacian_filtering',
+                                                          'sigma': sigma,
+                                                          'reinforce': False,
+                                                          'symmetrize': True,
+                                                          # 额外：加速/稀疏选项
+                                                          'knn': None,          # int 或 None：每行只保留 k 个最近邻
+                                                          'normalized': False    # True: 归一化(减加权平均)；False: 未归一化(减加权和)
+                                                          },
+                                                      visualize=False
+                                                      )
     
     # *************************** here may should be revised 20250508
     factor_matrix = feature_engineering.normalize_matrix(factor_matrix)
@@ -140,6 +246,7 @@ def compute_ci_fitting(method, params_dict, distance_matrix, connectivity_matrix
     return ci_fitting
 
 # %% Optimization
+from scipy.optimize import differential_evolution
 def optimize_and_store(method, loss_fn, bounds, param_keys, distance_matrix, connectivity_matrix, RCM='differ'):
     res = differential_evolution(loss_fn, bounds=bounds, strategy='best1bin', maxiter=1000)
     params = dict(zip(param_keys, res.x))
@@ -200,188 +307,44 @@ class FittingConfig:
         return lambda p: {name: p[i] for i, name in enumerate(param_names)}
 
     config_basic_model_differ_recovery = {
-        'Exponential': {
+        'Generalized_Surface_Laplacian': {
             'param_names': ['sigma'],
             'bounds': [(0.1, 20.0)],
-        },
-        'Gaussian': {
-            'param_names': ['sigma'],
-            'bounds': [(0.1, 20.0)],
-        },
-        'Inverse': {
-            'param_names': ['sigma', 'alpha'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0)],
-        },
-        'Power_Law': {
-            'param_names': ['alpha'],
-            'bounds': [(0.1, 10.0)],
-        },
-        'Rational_Quadratic': {
-            'param_names': ['sigma', 'alpha'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0)],
-        },
-        'Generalized_Gaussian': {
-            'param_names': ['sigma', 'beta'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0)],
-        },
-        'Sigmoid': {
-            'param_names': ['mu', 'beta'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0)],
         },
     }
 
     config_advanced_model_differ_recovery = {
-        'Exponential': {
+        'Generalized_Surface_Laplacian': {
             'param_names': ['sigma', 'deviation', 'offset'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Gaussian': {
-            'param_names': ['sigma', 'deviation', 'offset'],
-            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Inverse': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
-        },
-        'Power_Law': {
-            'param_names': ['alpha', 'deviation', 'offset'],
-            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0)],
-        },
-        'Rational_Quadratic': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Generalized_Gaussian': {
-            'param_names': ['sigma', 'beta', 'deviation', 'offset'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0)],
-        },
-        'Sigmoid': {
-            'param_names': ['mu', 'beta', 'deviation', 'offset'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
     }
 
     config_basic_model_linear_recovery = {
-        'Exponential': {
+        'Generalized_Surface_Laplacian': {
             'param_names': ['sigma', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0)],
-        },
-        'Gaussian': {
-            'param_names': ['sigma', 'scale_a'],
-            'bounds': [(0.1, 20.0), (-1.0, 1.0)],
-        },
-        'Inverse': {
-            'param_names': ['sigma', 'alpha', 'scale_a'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
-        },
-        'Power_Law': {
-            'param_names': ['alpha', 'scale_a'],
-            'bounds': [(0.1, 10.0), (-1.0, 1.0)],
-        },
-        'Rational_Quadratic': {
-            'param_names': ['sigma', 'alpha', 'scale_a'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0)],
-        },
-        'Generalized_Gaussian': {
-            'param_names': ['sigma', 'beta', 'scale_a'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0)],
-        },
-        'Sigmoid': {
-            'param_names': ['mu', 'beta', 'scale_a'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0)],
         },
     }
 
     config_advanced_model_linear_recovery = {
-        'Exponential': {
+        'Generalized_Surface_Laplacian': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Gaussian': {
-            'param_names': ['sigma', 'deviation', 'offset', 'scale_a'],
-            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Inverse': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Power_Law': {
-            'param_names': ['alpha', 'deviation', 'offset', 'scale_a'],
-            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Rational_Quadratic': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Generalized_Gaussian': {
-            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
-        },
-        'Sigmoid': {
-            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0)],
         },
     }
 
     config_basic_model_linear_ratio_recovery = {
-        'Exponential': {
+        'Generalized_Surface_Laplacian': {
             'param_names': ['sigma', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Gaussian': {
-            'param_names': ['sigma', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Inverse': {
-            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Power_Law': {
-            'param_names': ['alpha', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Rational_Quadratic': {
-            'param_names': ['sigma', 'alpha', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Generalized_Gaussian': {
-            'param_names': ['sigma', 'beta', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Sigmoid': {
-            'param_names': ['mu', 'beta', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (0.01, 2.0)],
         },
     }
 
     config_advanced_model_linear_ratio_recovery = {
-        'Exponential': {
+        'Generalized_Surface_Laplacian': {
             'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
             'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Gaussian': {
-            'param_names': ['sigma', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Inverse': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Power_Law': {
-            'param_names': ['alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 10.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Rational_Quadratic': {
-            'param_names': ['sigma', 'alpha', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 10.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Generalized_Gaussian': {
-            'param_names': ['sigma', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 20.0), (0.1, 5.0), (1e-6, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
-        },
-        'Sigmoid': {
-            'param_names': ['mu', 'beta', 'deviation', 'offset', 'scale_a', 'scale_b'],
-            'bounds': [(0.1, 10.0), (0.1, 5.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (0.01, 2.0)],
         },
     }
 
