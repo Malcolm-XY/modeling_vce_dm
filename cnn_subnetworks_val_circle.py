@@ -326,10 +326,10 @@ def save_to_xlsx_fitting(results, subject_range, experiment_range, folder_name, 
 
 # %% Execute
 if __name__ == '__main__':
-    selection_rate_list = [1, 0.75, 0.5, 0.3] #, 0.2, 0.1, 0.05]
+    selection_rate_list = [1, 0.75, 0.5, 0.3, 0.2, 0.1, 0.05]
     
     for selection_rate in selection_rate_list:
-        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', model_rcm='linear_ratio', 
+        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='linear_ratio', 
                                                     feature_cm='pcc', subject_range=range(6, 16), selection_rate=selection_rate, save=True)
     
     # %% End

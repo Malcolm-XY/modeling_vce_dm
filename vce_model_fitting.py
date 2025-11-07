@@ -827,7 +827,7 @@ def draw_tsne(
         n_components=2,
         perplexity=perplexity,
         random_state=random_state,
-        n_iter=n_iter,
+        max_iter=n_iter,
         init="pca",
         learning_rate="auto"
     )
@@ -838,7 +838,7 @@ def draw_tsne(
 
     # 使用输入顺序（而非排序）
     unique_models = [m for m in models if m in label_all]
-    cmap = cm.get_cmap("tab10", len(unique_models))
+    cmap = plt.get_cmap("tab10", len(unique_models))
     color_map = {model: cmap(i) for i, model in enumerate(unique_models)}
 
     plotted_handles, plotted_labels = [], []
@@ -957,7 +957,7 @@ def draw_tsne_(cis_dict, perplexity: int = 5, random_state: int = 42, n_iter: in
         perplexity = max(1, data_all.shape[0] - 1)
 
     # ========= t-SNE =========
-    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=random_state, n_iter=n_iter)
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=random_state, max_iter=n_iter)
     tsne_result = tsne.fit_transform(data_all)
 
     # ========= Plotting =========
@@ -1209,11 +1209,11 @@ if __name__ == '__main__':
     #                                                 'label_driven_mi', channel_manual_remove)
     
     # %% Fitting
-    fm_model, rcm_model = 'advanced', 'linear_ratio' # 'basic', 'advanced'; 'differ', 'linear', 'linear_ratio'
+    fm_model, rcm_model = 'basic', 'differ' # 'basic', 'advanced'; 'differ', 'linear', 'linear_ratio'
     # results, cis_fitted = fitting_model(fm_model, rcm_model, ci_reference, distance_matrix, cm_global_averaged)
     
     results_best, cis_best, _, cis_all = fitting_model_best(fm_model, rcm_model, 
-                                                                      ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=10)
+                                                                      ci_reference, distance_matrix, cm_global_averaged, N_TRIALS=1)
     
     # %% Insert reference (LDMI) and initial ci (CM)
     ci_initial_model = np.mean(cm_global_averaged, axis=0)

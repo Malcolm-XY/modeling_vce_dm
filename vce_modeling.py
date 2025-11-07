@@ -150,6 +150,10 @@ def compute_volume_conduction_factors_advanced_model(_distance_matrix, method='e
     # 通用参数
     deviation = params.get('deviation', 0.0)
     offset = params.get('offset', 0.0)
+    
+    # -------------------test
+    # print(f"deviation: {deviation}; offset: {offset}")
+    
     _d = _distance_matrix + deviation  # 统一偏移
     epsilon = 1e-6  # 防止除0或log0
 
