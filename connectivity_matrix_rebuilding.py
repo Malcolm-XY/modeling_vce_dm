@@ -11,6 +11,43 @@ import vce_model_fitting
 
 import numpy as np
 import feature_engineering
+
+from vce_model_fitting_competing import apply_generalized_surface_laplacian_filtering
+def cm_rebuilding_competing(cms, distance_matrix, params, model='exponential', model_config='basic', rcm_normalization=False):
+    """
+    重建功能连接矩阵（Reconstructed Connectivity Matrices, RCM）。
+
+    参数：
+        cms (np.ndarray): 原始功能连接矩阵，形状为 (N, H, W)
+        distance_matrix (np.ndarray): 电极距离矩阵，形状为 (H, W)
+        params (dict): 参数字典，包括 scale_a, scale_b 等
+
+    返回：
+        cms_rebuilt (np.ndarray): 重建后的功能连接矩阵，形状为 (N, H, W)
+    """
+    cms_rebuilt = []
+    
+    if len(cms.shape) == 2:
+        cms_rebuilt = apply_generalized_surface_laplacian_filtering(cms, distance_matrix, params)
+        return cms_rebuilt
+    
+    elif len(cms.shape) == 3:
+        for i, cm in enumerate(cms):
+            # Apply filtering or model-based reconstruction
+            cm_rebuilt = apply_generalized_surface_laplacian_filtering(cm, distance_matrix, params)
+            
+            # Optional normalization (to ensure comparable scales)
+            if rcm_normalization:
+                norm = np.linalg.norm(cm_rebuilt, ord='fro')
+                if norm > 0:
+                    cm_rebuilt = cm_rebuilt / norm
+    
+            cms_rebuilt.append(cm_rebuilt)
+        
+        # Stack results along the first dimension
+        cms_rebuilt = np.stack(cms_rebuilt, axis=0)
+        return cms_rebuilt
+
 def cm_rebuilding(cms, distance_matrix, params, model='exponential', model_fm='basic', model_rcm='differ',
                   fm_normalization=True, rcm_normalization=False):
     """

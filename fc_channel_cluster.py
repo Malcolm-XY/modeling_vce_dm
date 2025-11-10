@@ -5,7 +5,6 @@ Created on Wed Jan 15 18:18:41 2025
 @author: usouu
 """
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
 from collections import defaultdict

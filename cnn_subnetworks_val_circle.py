@@ -15,127 +15,127 @@ from models import models
 import feature_engineering
 from utils import utils_feature_loading
 
-def cnn_subnetworks_evaluation_circle_control_1(argument='data_driven_pcc_10_15', selection_rate=1, feature_cm='pcc', 
-                                                subject_range=range(11,16), experiment_range=range(1,4), 
+from connectivity_matrix_rebuilding import cm_rebuilding_competing
+def cnn_subnetworks_evaluation_circle_competing(projection_params={"source": "auto", "type": "3d_euclidean"}, 
+                                                feature_cm='pcc', 
+                                                model='Generalized_Surface_Laplacian', model_config='basic', 
+                                                param='fitted_results_competing(sub1_sub5_joint_band)', 
+                                                subject_range=range(6,16), experiment_range=range(1,4), 
+                                                subnetworks_extract='separate_index', selection_rate=1,
+                                                subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
                                                 save=False):
-    # labels
-    labels = utils_feature_loading.read_labels(dataset='seed')
-    y = torch.tensor(np.array(labels)).view(-1)
+    # distance matrix
+    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"}, visualize=True)
+    dm = feature_engineering.normalize_matrix(dm)
+    
+    # parameters for construction of FM and RCM
+    param = read_params(model, model_config, folder=param, method='competing')
+    
+    # subnetwork extraction----start
+    if subnetworks_extract == 'unify_index':
+        fcs_global_averaged = utils_feature_loading.read_fcs_global_average('seed', feature_cm, 'joint',
+                                                                            subnets_exrtact_basis_sub)
+        alpha_global_averaged = fcs_global_averaged['alpha']
+        beta_global_averaged = fcs_global_averaged['beta']
+        gamma_global_averaged = fcs_global_averaged['gamma']
         
-    channel_weights = cw_manager.read_channel_weight_DD(argument, sort=True)
-    channel_selected = channel_weights.index[:int(len(channel_weights.index)*selection_rate)]
+        strength_alpha = np.sum(np.abs(alpha_global_averaged), axis=0)
+        strength_beta = np.sum(np.abs(beta_global_averaged), axis=0)
+        strength_gamma = np.sum(np.abs(gamma_global_averaged), axis=0)
+        
+        channel_importances = {'gamma': strength_gamma, 'beta': strength_beta, 'alpha': strength_alpha}
+    elif subnetworks_extract == 'separate_index':
+        fcs_global_averaged = utils_feature_loading.read_fcs_global_average('seed', feature_cm, 'joint',
+                                                                            subnets_exrtact_basis_sub)
+        alpha_global_averaged = fcs_global_averaged['alpha']
+        beta_global_averaged = fcs_global_averaged['beta']
+        gamma_global_averaged = fcs_global_averaged['gamma']
+        
+        alpha_global_averaged_rebuilded = cm_rebuilding_competing(alpha_global_averaged, dm, param)
+        beta_global_averaged_rebuilded = cm_rebuilding_competing(beta_global_averaged, dm, param)
+        gamma_global_averaged_rebuilded = cm_rebuilding_competing(gamma_global_averaged, dm, param)
+        
+        strength_alpha = np.sum(np.abs(alpha_global_averaged_rebuilded), axis=0)
+        strength_beta = np.sum(np.abs(beta_global_averaged_rebuilded), axis=0)
+        strength_gamma = np.sum(np.abs(gamma_global_averaged_rebuilded), axis=0)
+        
+        channel_importances = {'gamma': strength_gamma, 'beta': strength_beta, 'alpha': strength_alpha}
+
+    k = {'gamma': int(len(channel_importances['gamma']) * selection_rate),
+         'beta': int(len(channel_importances['beta']) * selection_rate),
+         'alpha': int(len(channel_importances['alpha']) * selection_rate),
+          }
+    
+    channel_selects = {'gamma': np.argsort(channel_importances['gamma'])[-k['gamma']:][::-1],
+                       'beta': np.argsort(channel_importances['beta'])[-k['beta']:][::-1],
+                       'alpha': np.argsort(channel_importances['alpha'])[-k['alpha']:][::-1]
+                       }
+    # subnetwork extraction----end
+    
+    # labels
+    labels = utils_feature_loading.read_labels(dataset='seed', header=True)
+    y = torch.tensor(np.array(labels)).view(-1)
     
     # data and evaluation circle
     all_results_list = []
-
+    
     for sub in subject_range:
         for ex in experiment_range:
             subject_id = f"sub{sub}ex{ex}"
             print(f"Evaluating {subject_id}...")
-
-            # CM/MAT
-            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
-            alpha = features['alpha'][:,channel_selected,:][:,:,channel_selected]
-            beta = features['beta'][:,channel_selected,:][:,:,channel_selected]
-            gamma = features['gamma'][:,channel_selected,:][:,:,channel_selected]
             
             # CM/H5
-            # features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
-            # alpha = features['alpha'][:,channel_selected,:][:,:,channel_selected]
-            # beta = features['beta'][:,channel_selected,:][:,:,channel_selected]
-            # gamma = features['gamma'][:,channel_selected,:][:,:,channel_selected]
-            
-            x = np.stack((alpha, beta, gamma), axis=1)
+            features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
+            alpha = features['alpha']
+            beta = features['beta']
+            gamma = features['gamma']
 
+            # RCM
+            alpha_rebuilded = cm_rebuilding_competing(alpha, dm, param)
+            beta_rebuilded = cm_rebuilding_competing(beta, dm, param)
+            gamma_rebuilded = cm_rebuilding_competing(gamma, dm, param)
+            
+            # subnetworks
+            alpha_rebuilded = alpha_rebuilded[:,channel_selects['alpha'],:][:,:,channel_selects['alpha']]
+            beta_rebuilded = beta_rebuilded[:,channel_selects['beta'],:][:,:,channel_selects['beta']]
+            gamma_rebuilded = gamma_rebuilded[:,channel_selects['gamma'],:][:,:,channel_selects['gamma']]
+            
+            x_rebuilded = np.stack((alpha_rebuilded, beta_rebuilded, gamma_rebuilded), axis=1)
+            
             # cnn model
             cnn_model = models.CNN_2layers_adaptive_maxpool_3()
             # traning and testing
-            result_CM = cnn_validation.cnn_cross_validation(cnn_model, x, y)
-
+            result_RCM = cnn_validation.cnn_cross_validation(cnn_model, x_rebuilded, y)
+            
             # Flatten result and add identifier
-            result_flat = {'Identifier': subject_id, **result_CM}
+            result_flat = {'Identifier': subject_id, **result_RCM}
             all_results_list.append(result_flat)
-
+            
     # Convert list of dicts to DataFrame
     df_results = pd.DataFrame(all_results_list)
     
     # Compute mean of all numeric columns (excluding Identifier)
     mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
     mean_row['Identifier'] = 'Average'
-    df_results = pd.concat([df_results, pd.DataFrame([mean_row])], ignore_index=True)
+    
+    # Std
+    std_row = df_results.select_dtypes(include=[np.number]).std(ddof=0).to_dict()
+    std_row['Identifier'] = 'Std'
+    
+    df_results = pd.concat([df_results, pd.DataFrame([mean_row, std_row])], ignore_index=True)
     
     # Save
     if save:
         folder_name = 'results_cnn_subnetwork_evaluation'
-        file_name = 'cnn_validation_SubCM_pcc_by_DDPCC.xlsx'
-        file_name = f'cnn_validation_SubCM_{feature_cm}_by_DD{feature_cm.upper()}.xlsx'
-        sheet_name = f'selection_rate_{selection_rate}'
-        
-        save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
-
-    return df_results
-
-def cnn_subnetworks_evaluation_circle_control_2(argument='label_driven_mi_10_15', selection_rate=1, feature_cm='pcc', 
-                                              subject_range=range(11,16), experiment_range=range(1,4), 
-                                              save=False, iden='mi'):
-    # labels
-    labels = utils_feature_loading.read_labels(dataset='seed')
-    y = torch.tensor(np.array(labels)).view(-1)
-        
-    channel_weights = cw_manager.read_channel_weight_LD(argument, sort=True)
-    channel_selected = channel_weights.index[:int(len(channel_weights.index)*selection_rate)]
-    
-    # data and evaluation circle
-    all_results_list = []
-
-    for sub in subject_range:
-        for ex in experiment_range:
-            subject_id = f"sub{sub}ex{ex}"
-            print(f"Evaluating {subject_id}...")
-
-            # CM/MAT
-            features = utils_feature_loading.read_fcs_mat('seed', subject_id, feature_cm)
-            alpha = features['alpha'][:,channel_selected,:][:,:,channel_selected]
-            beta = features['beta'][:,channel_selected,:][:,:,channel_selected]
-            gamma = features['gamma'][:,channel_selected,:][:,:,channel_selected]
-            
-            # CM/H5
-            # features = utils_feature_loading.read_fcs('seed', subject_id, feature_cm)
-            # alpha = features['alpha'][:,channel_selected,:][:,:,channel_selected]
-            # beta = features['beta'][:,channel_selected,:][:,:,channel_selected]
-            # gamma = features['gamma'][:,channel_selected,:][:,:,channel_selected]
-            
-            x = np.stack((alpha, beta, gamma), axis=1)
-
-            # cnn model
-            cnn_model = models.CNN_2layers_adaptive_maxpool_3()
-            # traning and testing
-            result_CM = cnn_validation.cnn_cross_validation(cnn_model, x, y)
-
-            # Flatten result and add identifier
-            result_flat = {'Identifier': subject_id, **result_CM}
-            all_results_list.append(result_flat)
-
-    # Convert list of dicts to DataFrame
-    df_results = pd.DataFrame(all_results_list)
-    
-    # Compute mean of all numeric columns (excluding Identifier)
-    mean_row = df_results.select_dtypes(include=[np.number]).mean().to_dict()
-    mean_row['Identifier'] = 'Average'
-    df_results = pd.concat([df_results, pd.DataFrame([mean_row])], ignore_index=True)
-    
-    # Save
-    if save:
-        folder_name = 'results_cnn_subnetwork_evaluation'
-        file_name = f'cnn_validation_SubCM_{feature_cm}_by_LD{iden.upper()}.xlsx'
-        sheet_name = f'selection_rate_{selection_rate}'
+        file_name = f'cnn_validation_SubRCM_{feature_cm}_by_{model}_rcm.xlsx'
+        sheet_name = f'GLF_sr_{selection_rate}'
         
         save_to_xlsx_sheet(df_results, folder_name, file_name, sheet_name)
 
     return df_results
 
 from connectivity_matrix_rebuilding import cm_rebuilding as cm_rebuild
-def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "auto", "type": "3d_spherical"}, 
+def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "auto", "type": "3d_euclidean"}, 
                                                  feature_cm='pcc', 
                                                  model='Exponential', model_fm='basic', model_rcm='linear',
                                                  param='fitted_results(sub1_sub5_joint_band)', 
@@ -144,7 +144,7 @@ def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "a
                                                  subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
                                                  save=False):
     # distance matrix
-    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_spherical"}, visualize=True)
+    _, dm = feature_engineering.compute_distance_matrix(dataset="seed", projection_params={"type": "3d_euclidean"}, visualize=True)
     dm = feature_engineering.normalize_matrix(dm)
     
     # parameters for construction of FM and RCM
@@ -254,26 +254,30 @@ def cnn_subnetworks_evaluation_circle_rebuilt_cm(projection_params={"source": "a
     return df_results
 
 def cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='linear', 
-                                                feature_cm='pcc', subject_range=range(6,16), selection_rate=1, save=False):
+                                                feature_cm='pcc', subject_range=range(6,16), 
+                                                subnetworks_extract='separate_index', selection_rate=1, save=False):
     model = list(['exponential', 'gaussian', 'inverse', 'power_law', 'rational_quadratic', 'generalized_gaussian', 'sigmoid'])
     
     results_fitting = {}
     for trail in range(0, 7):       
         results_fitting[model[trail]] = cnn_subnetworks_evaluation_circle_rebuilt_cm(
-                                                            projection_params={"source": "auto", "type": "3d_spherical"}, 
+                                                            projection_params={"source": "auto", "type": "3d_euclidean"}, 
                                                             feature_cm=feature_cm, 
                                                             model=model[trail], model_fm=model_fm, model_rcm=model_rcm,
                                                             param='fitted_results(sub1_sub5_joint_band)', 
                                                             subject_range=subject_range, experiment_range=range(1,4), 
-                                                            subnetworks_extract='separate_index', selection_rate=selection_rate,
+                                                            subnetworks_extract=subnetworks_extract, selection_rate=selection_rate,
                                                             subnets_exrtact_basis_sub=range(1,6), subnets_exrtact_basis_ex=range(1,4),
                                                             save=save)
     
     return results_fitting
 
 # %% read parameters/save
-def read_params(model='exponential', model_fm='basic', model_rcm='differ', folder='fitted_results(sub1_sub5_joint_band)'):
-    identifier = f'{model_fm.lower()}_fm_{model_rcm.lower()}_rcm'
+def read_params(model='exponential', model_fm='basic', model_rcm='differ', folder='fitted_results(sub1_sub5_joint_band)', method='residual'):
+    if method == 'residual':
+        identifier = f'{model_fm.lower()}_fm_{model_rcm.lower()}_rcm'
+    elif method == 'competing':
+        identifier = f'{model_fm.lower()}'
     
     path_current = os.getcwd()
     path_fitting_results = os.path.join(path_current, 'fitted_results', folder)
@@ -330,8 +334,15 @@ if __name__ == '__main__':
     
     for selection_rate in selection_rate_list:
         cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='linear_ratio', 
-                                                    feature_cm='pcc', subject_range=range(6, 16), selection_rate=selection_rate, save=True)
+                                                    feature_cm='pcc', subject_range=range(6, 16), 
+                                                    subnetworks_extract='separate_index',
+                                                    selection_rate=selection_rate, save=True)
+        
+        # cnn_subnetworks_evaluation_circle_competing(feature_cm='pcc', model_config='basic', 
+        #                                             subject_range=range(6,16), experiment_range=range(1,4), 
+        #                                             subnetworks_extract='separate_index', selection_rate=selection_rate,
+        #                                             save=True)
     
     # %% End
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
