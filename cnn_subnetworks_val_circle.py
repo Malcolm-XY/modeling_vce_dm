@@ -333,16 +333,28 @@ if __name__ == '__main__':
     selection_rate_list = [1, 0.75, 0.5, 0.3, 0.2, 0.1, 0.05]
     
     for selection_rate in selection_rate_list:
-        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', model_rcm='linear', 
+        # Basic
+        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='linear', 
                                                     feature_cm='pcc', subject_range=range(6, 16), 
-                                                    subnetworks_extract='separate_index',
+                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
                                                     selection_rate=selection_rate, save=True)
         
-        # cnn_subnetworks_evaluation_circle_competing(feature_cm='pcc', model_config='basic', 
-        #                                             subject_range=range(6,16), experiment_range=range(1,4), 
-        #                                             subnetworks_extract='separate_index', selection_rate=selection_rate,
-        #                                             save=True)
-    
+        cnn_subnetworks_evaluation_circle_competing(model_config='basic', 
+                                                    feature_cm='pcc', subject_range=range(6,16),
+                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
+                                                    selection_rate=selection_rate, save=True)
+        
+        # Advance
+        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advance', model_rcm='linear_ratio', 
+                                                    feature_cm='pcc', subject_range=range(6, 16), 
+                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
+                                                    selection_rate=selection_rate, save=True)
+        
+        cnn_subnetworks_evaluation_circle_competing(model_config='advance', 
+                                                    feature_cm='pcc', subject_range=range(6,16),
+                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
+                                                    selection_rate=selection_rate, save=True)
+        
     # %% End
     from cnn_val_circle import end_program_actions
     end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
