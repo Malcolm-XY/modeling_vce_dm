@@ -564,10 +564,15 @@ def mbpe_appendix(method='glf',feature='pcc'):
 
 # %% main
 if __name__ == "__main__":
-    # summary
+    # partia
     accuracy_pcc, f1score_pcc = accuracy_partia('pcc')
     df_sbpe = sbpe_partia('pcc')
     df_mbpe = mbpe_partia('pcc')
     
+    # partia
+    accuracy_pcc, f1score_pcc = accuracy_partia('pcc', 'advanced')
+    df_sbpe = sbpe_partia('pcc', 'advanced')
+    df_mbpe = mbpe_partia('pcc', 'advanced')
+    
     # selected
-    acc, f1 = accuracy_selected()
+    # acc, f1 = accuracy_selected()
