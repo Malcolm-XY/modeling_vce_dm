@@ -271,6 +271,234 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
     fig.tight_layout()
     plt.show()
 
+# effect-values
+def plot_diff_e_heatmap( 
+    effect_df: pd.DataFrame,   # Cohen's d
+    diff_df: pd.DataFrame,     # Δmean (row - col)
+    title: str | None = None,
+    cmap_diff: str = "coolwarm",   # 上三角色图
+    cmap_e: str = "Purples",       # 下三角色图
+    fmt: str = ".2f",
+    same_cmap: bool = False,
+    draw_diagonal: bool = True
+):
+    import textwrap
+
+    # —— 文本换行 ——
+    def wrap_labels(labels, width=25):
+        return ['\n'.join(textwrap.wrap(l, width)) for l in labels]
+
+    # —— 若要统一颜色 —— 
+    if same_cmap:
+        cmap_e = cmap_diff
+
+    # —— 对齐 —— 
+    diff_df = diff_df.loc[effect_df.index, effect_df.columns]
+    effect_df = effect_df.loc[effect_df.index, effect_df.columns]
+    methods = diff_df.index.tolist()
+    k = len(methods)
+
+    # —— 建立画布布局 —— 
+    fig = plt.figure(figsize=(10, 8))
+    
+    # 调整 gridspec 定义
+    gs = fig.add_gridspec(
+        nrows=5, ncols=5,
+        width_ratios=[30, 30, 1, 1, 1], 
+        height_ratios=[20, 35, 1, 1, 1],
+        # 调整 wspace 和 hspace (如果需要)
+        wspace=0.1, hspace=0.1
+    )
+    
+    # 1. 主图 Axes (ax)
+    ax = fig.add_subplot(gs[1, 1])
+    # 2. 第一个 Colorbar (cax_diff) - 垂直
+    cax_diff = fig.add_subplot(gs[1, 2])
+    # 3. 第二个 Colorbar (cax_eff) - 水平，长度缩小
+    cax_eff = fig.add_subplot(gs[2, 1])
+    # ------
+    
+    
+    # —— 颜色范围 —— 
+    diff_vals = diff_df.values.astype(float)
+    eff_vals = effect_df.values.astype(float)
+
+    diff_max = np.nanmax(np.abs(diff_vals))
+    vmin_diff, vmax_diff = -diff_max, diff_max
+
+    eff_max = np.nanmax(np.abs(eff_vals))
+    vmin_eff, vmax_eff = 0.0, eff_max
+
+    # —— 上三角（Δmean）——
+    mask_lower = np.tril(np.ones_like(diff_vals, dtype=bool), 0)
+    sns.heatmap(
+        diff_df,
+        mask=mask_lower,
+        cmap=cmap_diff,
+        vmin=vmin_diff, vmax=vmax_diff,
+        center=0.0,
+        square=True,
+        ax=ax,
+        cbar=True,
+        cbar_ax=cax_diff,
+        cbar_kws={"label": "Δ mean (row - col)"}
+    )
+
+    # —— 下三角（effect size）——
+    mask_upper = np.triu(np.ones_like(eff_vals, dtype=bool), 0)
+    sns.heatmap(
+        np.abs(effect_df),  # 着色用绝对值，符号靠文本
+        mask=mask_upper,
+        cmap=cmap_e,
+        vmin=vmin_eff, vmax=vmax_eff,
+        square=True,
+        ax=ax,
+        cbar=True,
+        cbar_ax=cax_eff,
+        cbar_kws={"label": "Effect size |d| (col - row)", 
+                  "orientation": "horizontal"}
+    )
+
+    # —— 文本标注 —— 
+    annot = np.empty((k, k), dtype=object)
+
+    for i in range(k):
+        for j in range(k):
+            if i == j:
+                annot[i, j] = ""
+            elif i < j:
+                # 上三角：行 − 列（Δmean）
+                d = diff_df.iloc[i, j]
+                arrow = "↑" if d > 0 else ("↓" if d < 0 else "")
+                annot[i, j] = f"{d:{fmt}}{arrow}"
+            else:
+                # 下三角：列 − 行（效应量原符号）
+                e = effect_df.iloc[i, j]
+                annot[i, j] = f"{e:{fmt}}"
+
+    # —— 根据背景色调整字体颜色 —— 
+    cm_diff = plt.cm.get_cmap(cmap_diff)
+    cm_eff = plt.cm.get_cmap(cmap_e)
+
+    for i in range(k):
+        for j in range(k):
+
+            text = annot[i, j]
+            if text == "":
+                continue
+
+            # 计算背景颜色
+            if i < j:
+                # 上三角 → diff 用 cmap_diff
+                val = diff_df.iloc[i, j]
+                norm = (val - vmin_diff) / (vmax_diff - vmin_diff)
+                r, g, b, _ = cm_diff(norm)
+            else:
+                # 下三角 → effect 用 cmap_e
+                val = abs(effect_df.iloc[i, j])
+                norm = (val - vmin_eff) / (vmax_eff - vmin_eff)
+                r, g, b, _ = cm_eff(norm)
+
+            # luminance
+            lum = 0.299*r + 0.587*g + 0.114*b
+            font_color = "white" if lum < 0.5 else "black"
+
+            ax.text(
+                j + 0.5, i + 0.5,
+                text,
+                ha="center", va="center",
+                fontsize=9,
+                color=font_color
+            )
+
+    # —— 刻度 —— 
+    wrapped = wrap_labels(methods, width=25)
+
+    ax.set_xticks(np.arange(k) + 0.5)
+    ax.set_xticklabels(wrapped, rotation=35, ha="left")
+    ax.set_yticks(np.arange(k) + 0.5)
+    ax.set_yticklabels(wrapped)
+
+    ax.xaxis.tick_top()
+    ax.tick_params(axis='x', bottom=False, top=True,
+                   labelbottom=False, labeltop=True)
+
+    if title:
+        ax.set_title(title, pad=40, fontsize=14)
+        
+    if draw_diagonal:
+        for i in range(k):
+            ax.add_line(plt.Line2D(
+                [i, i+1], [i, i+1],
+                color="black", linewidth=1.5, zorder=10
+            ))
+        
+    plt.tight_layout()
+    plt.show()
+
+def estimate_effect_matrix_from_summary(
+    df: pd.DataFrame,
+    identifier: str = "identifier",
+    iv: str = "srs",
+    mean_col: str = "data",
+    std_col: str = "stds",
+    n: int = 30,
+):
+    effect_matrices: dict[float, pd.DataFrame] = {}
+    diff_matrices: dict[float, pd.DataFrame] = {}
+
+    for iv_value, sub in df.groupby(iv):
+
+        sub = sub.set_index(identifier)
+        methods = list(sub.index)
+
+        means = sub[mean_col].astype(float)
+        stds = sub[std_col].astype(float)
+
+        k = len(methods)
+
+        # 效应量矩阵 (Cohen's d)
+        d_mat = np.zeros((k, k), dtype=float)
+
+        # 均值差矩阵 Δm = m_i - m_j
+        diff_mat = np.zeros((k, k), dtype=float)
+
+        for i in range(k):
+            for j in range(i + 1, k):
+
+                m1, m2 = means.iloc[i], means.iloc[j]
+                s1, s2 = stds.iloc[i], stds.iloc[j]
+
+                # 均值差
+                diff = m1 - m2
+                diff_mat[i, j] = diff
+                diff_mat[j, i] = -diff
+
+                # pooled standard deviation (equal n assumed)
+                # s_p = sqrt( ((n-1)*s1^2 + (n-1)*s2^2) / (2n-2) )
+                denom = (2 * n - 2)
+                if denom <= 0:
+                    d = np.nan
+                else:
+                    sp2 = ((n - 1) * s1**2 + (n - 1) * s2**2) / denom
+                    sp = np.sqrt(sp2)
+
+                    if sp == 0:
+                        d = np.nan
+                    else:
+                        d = diff / sp
+
+                d_mat[i, j] = d
+                d_mat[j, i] = -d  # 反号
+
+        d_df = pd.DataFrame(d_mat, index=methods, columns=methods)
+        diff_df = pd.DataFrame(diff_mat, index=methods, columns=methods)
+
+        effect_matrices[iv_value] = d_df
+        diff_matrices[iv_value] = diff_df
+
+    return effect_matrices, diff_matrices
+
 # p-values
 from scipy.stats import t as student_t
 def estimate_p_matrix_from_summary(
@@ -281,155 +509,211 @@ def estimate_p_matrix_from_summary(
     std_col: str = "stds",
     n: int = 30,
     two_tailed: bool = True,
-) -> dict[float, pd.DataFrame]:
+):
     p_matrices: dict[float, pd.DataFrame] = {}
+    diff_matrices: dict[float, pd.DataFrame] = {}
 
     for iv_value, sub in df.groupby(iv):
-        # 以 identifier 为 index，方便取值
+
         sub = sub.set_index(identifier)
         methods = list(sub.index)
 
-        # 提取均值和标准差向量
         means = sub[mean_col].astype(float)
         stds = sub[std_col].astype(float)
 
         k = len(methods)
+
+        # p 矩阵
         p_mat = np.full((k, k), np.nan, dtype=float)
+
+        # 均值差矩阵 Δm = m_i - m_j
+        diff_mat = np.zeros((k, k), dtype=float)
 
         for i in range(k):
             for j in range(i + 1, k):
+
                 m1, m2 = means.iloc[i], means.iloc[j]
                 s1, s2 = stds.iloc[i], stds.iloc[j]
+
+                # 均值差
+                diff = m1 - m2
+                diff_mat[i, j] = diff
+                diff_mat[j, i] = -diff
 
                 # 标准误差
                 se = np.sqrt(s1**2 / n + s2**2 / n)
                 if se == 0:
                     p = np.nan
                 else:
-                    t_stat = (m1 - m2) / se
+                    t_stat = diff / se
 
-                    # Welch–Satterthwaite 近似自由度
+                    # Welch–Satterthwaite df
                     v1 = s1**2 / n
                     v2 = s2**2 / n
-                    df_welch = (v1 + v2) ** 2 / (
-                        (v1**2) / (n - 1) + (v2**2) / (n - 1)
+                    df_welch = (v1 + v2)**2 / (
+                        (v1**2)/(n - 1) + (v2**2)/(n - 1)
                     )
 
-                    # 双侧 or 单侧 p 值
+                    # p-value
                     if two_tailed:
                         p = 2 * (1 - student_t.cdf(abs(t_stat), df_welch))
                     else:
                         p = 1 - student_t.cdf(abs(t_stat), df_welch)
 
                 p_mat[i, j] = p
-                p_mat[j, i] = p  # 对称
+                p_mat[j, i] = p
 
         p_df = pd.DataFrame(p_mat, index=methods, columns=methods)
+        diff_df = pd.DataFrame(diff_mat, index=methods, columns=methods)
+
         p_matrices[iv_value] = p_df
+        diff_matrices[iv_value] = diff_df
 
-    return p_matrices
-
-def p_to_star(p):
-    if p < 0.001:
-        return "***"
-    elif p < 0.01:
-        return "**"
-    elif p < 0.05:
-        return "*"
-    else:
-        return "ns"
+    return p_matrices, diff_matrices
 
 import seaborn as sns
-def plot_p_matrix_with_trend(
-    df,
-    identifier="identifier",
-    mean_col="data",
-    std_col="stds",
-    iv="srs",
-    n=30,
-    srs_value=1.0,
-    cmap="RdBu_r",
-    figsize=(12, 10),
-    fontsize=12
+def plot_diff_p_heatmap(
+    p_df: pd.DataFrame,
+    diff_df: pd.DataFrame,
+    title: str | None = None,
+    cmap_diff: str = "coolwarm",   # 均值差着色
+    cmap_p: str = "Purples",       # 显著性着色（可与均值差一致）
+    center: float = 0.0,
+    fmt: str = ".2f",
 ):
-    """
-    使用 estimate_p_matrix_from_summary() 的结果，
-    直接绘制：p 值 + 趋势 Δ 的组合热图。
-    """
+    import textwrap
 
-    # ---- STEP 1: 只选定某个 SR（通常为 SR=1.0 或你指定的 srs_value） ----
-    sub = df[df[iv] == srs_value].copy()
-    sub = sub.set_index(identifier)
-    methods = sub.index.tolist()
+    def wrap_labels(labels, width=25):
+        return ['\n'.join(textwrap.wrap(l, width)) for l in labels]
 
-    # 提取均值
-    means = sub[mean_col].astype(float)
-
-    # ---- STEP 2: 计算 Δmean 矩阵 ----
+    # -----------------------------
+    # Align
+    # -----------------------------
+    diff_df = diff_df.loc[p_df.index, p_df.columns]
+    methods = wrap_labels(p_df.index.tolist(), width=30)
     k = len(methods)
-    delta_mat = np.zeros((k, k))
 
+    # -----------------------------
+    # Build color matrix
+    # -----------------------------
+    diff_for_color = np.zeros((k, k), dtype=float)
+
+    # 上三角：diff
     for i in range(k):
         for j in range(k):
-            delta_mat[i, j] = means.iloc[j] - means.iloc[i]   # Δ = mean_j - mean_i
+            if i < j:
+                diff_for_color[i, j] = diff_df.iloc[i, j]
+            elif i == j:
+                diff_for_color[i, j] = np.nan
+            else:
+                # 下三角：由 p 值等级决定颜色
+                p = p_df.iloc[j, i]
+                if p < 0.001:
+                    level = 3
+                elif p < 0.01:
+                    level = 2
+                elif p < 0.05:
+                    level = 1
+                else:
+                    level = 0
+                diff_for_color[i, j] = level
 
-    # ---- STEP 3: 计算 p 值矩阵（Welch）----
-    from scipy.stats import t as student_t
-
-    p_mat = np.full((k, k), np.nan)
-    stds = sub[std_col].astype(float)
-
-    for i in range(k):
-        for j in range(i + 1, k):
-            m1, m2 = means.iloc[i], means.iloc[j]
-            s1, s2 = stds.iloc[i], stds.iloc[j]
-
-            se = np.sqrt(s1**2/n + s2**2/n)
-            t_stat = (m1 - m2) / se
-
-            v1 = s1**2 / n
-            v2 = s2**2 / n
-            dfw = (v1 + v2)**2 / ((v1**2)/(n-1) + (v2**2)/(n-1))
-
-            p = 2 * (1 - student_t.cdf(abs(t_stat), dfw))
-
-            p_mat[i, j] = p
-            p_mat[j, i] = p
-
-    # ---- STEP 4: 合成文本（趋势 + 显著性）----
+    # -----------------------------
+    # Build annot
+    # -----------------------------
     annot = np.empty((k, k), dtype=object)
+    annot[:, :] = ""
+
+    def p_to_stars(p):
+        if p < 0.001:  return "***"
+        if p < 0.01:   return "**"
+        if p < 0.05:   return "*"
+        return ""
+
     for i in range(k):
         for j in range(k):
             if i == j:
                 annot[i, j] = ""
+            elif i < j:
+                diff = diff_df.iloc[i, j]
+                arrow = "↑" if diff > 0 else ("↓" if diff < 0 else "")
+                annot[i, j] = f"{diff:{fmt}}{arrow}"
             else:
-                delta = delta_mat[i, j]
-                sign = "↑" if delta > 0 else "↓"
-                stars = p_to_star(p_mat[i, j])
-                annot[i, j] = f"{sign} {abs(delta):.2f}\n{stars}"
+                # p-value level + trend direction
+                diff = diff_df.iloc[j, i]  # 对称
+                arrow = "↑" if diff > 0 else ("↓" if diff < 0 else "")
+                p = p_df.iloc[j, i]
+                stars = p_to_stars(p)
+                annot[i, j] = f"{stars}{arrow}"
 
-    # ---- STEP 5: 绘图 ----
-    plt.figure(figsize=figsize)
-    sns.heatmap(
-        delta_mat,
-        cmap=cmap,
+    # -----------------------------
+    # Plot
+    # -----------------------------
+    plt.figure(figsize=(0.8 * k + 3, 0.8 * k + 3))
+
+    # 使用两个 colormap：
+    #   - 上三角 diff：centered cmap_diff
+    #   - 下三角 p：normalized cmap_p
+    # 解决办法：用 ListedColormap 合并两套色图
+    import matplotlib.colors as mcolors
+
+    # 创建显著性 colormap：从 cmap_p 取 4 个色块
+    p_levels = 4
+    cmap_p_obj = plt.get_cmap(cmap_p, p_levels)
+
+    # 创建 diff colormap
+    cmap_diff_obj = plt.get_cmap(cmap_diff)
+
+    # 构建一个组合 colormap（以便 heatmap 一次画完）
+    # 假设 diff 范围远大于 p-level 范围，不冲突即可
+    # diff: float, p-level: small int
+    cmap_combined = cmap_diff_obj
+
+    ax = sns.heatmap(
+        diff_for_color,
         annot=annot,
         fmt="",
+        cmap=cmap_combined,
+        center=center,
+        square=True,
+        linewidths=0.5,
+        linecolor="gray",
         xticklabels=methods,
         yticklabels=methods,
-        center=0,
-        square=True,
-        cbar_kws={"label": f"Δ({mean_col})"}
+        cbar=False,
+        cbar_kws={"shrink": 0.65, "aspect": 30}
     )
 
-    plt.title(f"P-value Matrix + Trend Δ ({mean_col}) at SR={srs_value}", fontsize=fontsize+4)
-    plt.xticks(rotation=45, ha="right", fontsize=fontsize)
-    plt.yticks(fontsize=fontsize)
+    # 对角线框
+    for i in range(k):
+        ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor="black", lw=1))
+
+    # ① 把 x 轴刻度放上面
+    ax.xaxis.set_ticks_position("top")
+    ax.tick_params(axis="x", top=True, bottom=False)
+    ax.xaxis.set_label_position("top")
+    
+    # ② 调整 ticklabel 的位置（关键）
+    plt.setp(ax.get_xticklabels(),
+             rotation=45,
+             ha="left", 
+             va="bottom")    # 垂直对齐底部 → 避免移位
+    
+    # ③ 增加 padding（tick 到轴之间的距离）
+    ax.tick_params(axis="x", pad=5) 
+
+    plt.yticks(rotation=0)
+    
+    if title is not None:
+        plt.title(title, pad=20)
+
     plt.tight_layout()
     plt.show()
 
+    return annot
+
 # %% -----------------------------
-def accuracy_partia(feature='pcc', model='basic'):
+def accuracy_partia(feature='pcc', model='basic', f1score=False):
     # color map
     cmap = plt.colormaps['tab20_r']
     
@@ -460,18 +744,20 @@ def accuracy_partia(feature='pcc', model='basic'):
                         cmap=cmap, use_alt_linestyles=True)
     
     # f1 score
-    f1score_dic = partia_data.f1score
-    df_f1score = pd.DataFrame(f1score_dic)
-    
-    plot_lines_with_band(df_f1score, dv='data', std='stds', 
-                        mode="ci", n=30, 
-                        ylabel="Average F1 Score (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, use_alt_linestyles=True)
-    
-    plot_lines_with_band(df_f1score, dv='stds', std='stds', 
-                        mode="none", 
-                        ylabel="F1 Score Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
-                        cmap=cmap, use_alt_linestyles=True)
+    df_f1score=None
+    if f1score:
+        f1score_dic = partia_data.f1score
+        df_f1score = pd.DataFrame(f1score_dic)
+        
+        plot_lines_with_band(df_f1score, dv='data', std='stds', 
+                            mode="ci", n=30, 
+                            ylabel="Average F1 Score (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
+                            cmap=cmap, use_alt_linestyles=True)
+        
+        plot_lines_with_band(df_f1score, dv='stds', std='stds', 
+                            mode="none", 
+                            ylabel="F1 Score Std. (%)", xlabel="Node Selection Rate (for Subnetwork Extraction)",
+                            cmap=cmap, use_alt_linestyles=True)
     
     return df_accuracy, df_f1score
 
@@ -571,25 +857,7 @@ def mbpe_partia(feature='pcc', model='basic'):
               ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="FN Recovery Methods",
               xtick_rotation=30, wrap_width=30, figsize=(10,10), lower_limit=70, hatchs=hatchs)
     
-    df_simple = df_augmented.groupby('identifier').first().reset_index()
-    
-    # test; p-values
-    p_matrix = estimate_p_matrix_from_summary(df_simple, mean_col='MBPEs', std_col='MBPE_stds', n=30)
-    
-    plot_p_matrix_with_trend(
-        df_simple,
-        identifier="identifier",
-        mean_col="MBPEs",
-        std_col="MBPE_stds",
-        iv="srs",
-        n=30,
-        srs_value=1.0,
-        cmap="RdBu_r",
-        figsize=(12, 10),
-        fontsize=12
-    )
-    
-    return df_augmented, p_matrix
+    return df_augmented
     
 # %% -----------------------------
 def accuracy_selected():
@@ -745,15 +1013,40 @@ def mbpe_appendix(method='glf',feature='pcc'):
 
 # %% main
 if __name__ == "__main__":
-    # partia_basic
+    # %% partia_basic
     accuracy_pcc, f1score_pcc = accuracy_partia('pcc')
     df_sbpe = sbpe_partia('pcc')
-    df_mbpe, p1 = mbpe_partia('pcc')
+    df_mbpe = mbpe_partia('pcc')
     
-    # partia_advanced
-    accuracy_pcc, f1score_pcc = accuracy_partia('pcc', 'advanced')
-    df_sbpe = sbpe_partia('pcc', 'advanced')
-    df_mbpe, p2 = mbpe_partia('pcc', 'advanced')
+    # perparation
+    df_simple = df_mbpe.groupby('identifier', sort=False).first().reset_index()
+    r1, r2, r3, r4, r5, r6 = df_simple.loc[2], df_simple.loc[3], df_simple.loc[4], df_simple.loc[5], df_simple.loc[1], df_simple.loc[0]
+    df = pd.DataFrame([r1,r2,r3,r4,r5,r6])
     
-    # selected
+    # p values and matrix
+    p_matrix, diff_matrix = estimate_p_matrix_from_summary(df, mean_col='MBPEs', std_col='MBPE_stds', n=30)
+    ann = plot_diff_p_heatmap(p_matrix[1], diff_matrix[1])
+    
+    # effect values
+    e_matrix, diff_matrix = estimate_effect_matrix_from_summary(df, mean_col='MBPEs', std_col='MBPE_stds', n=30)
+    ann = plot_diff_e_heatmap(-e_matrix[1], diff_matrix[1])
+    
+    # %% partia_advanced
+    # accuracy_pcc, f1score_pcc = accuracy_partia('pcc', 'advanced')
+    # df_sbpe = sbpe_partia('pcc', 'advanced')
+    # df_mbpe = mbpe_partia('pcc', 'advanced')
+    
+    # # p values and matrix
+    # df_simple = df_mbpe.groupby('identifier', sort=False).first().reset_index()
+    # r1, r2, r3, r4, r5, r6 = df_simple.loc[2], df_simple.loc[3], df_simple.loc[4], df_simple.loc[5], df_simple.loc[1], df_simple.loc[0]
+    # df = pd.DataFrame([r1,r2,r3,r4,r5,r6])
+    
+    # p_matrix, diff_matrix = estimate_p_matrix_from_summary(df, mean_col='MBPEs', std_col='MBPE_stds', n=30)
+    # ann = plot_diff_p_heatmap(p_matrix[1], diff_matrix[1])
+    
+    # # effect values
+    # e_matrix, diff_matrix = estimate_effect_matrix_from_summary(df, mean_col='MBPEs', std_col='MBPE_stds', n=30)
+    # ann = plot_diff_e_heatmap(-e_matrix[1], diff_matrix[1])
+    
+    # %% selected
     # acc, f1 = accuracy_selected()
