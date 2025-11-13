@@ -179,6 +179,7 @@ def plot_lines_with_band(df: pd.DataFrame, identifier: str = "identifier", iv: s
 def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs", dv: str = "data", std: str = "stds",
     mode: str = "sem", level: float = 0.95, n: int | None = None, 
     ylabel: str = "YLABEL", xlabel: str = "XLABEL",
+    error_handle_label = None,
     figsize = (10,10), lower_limit = 'auto', fontsize: int = 16, bar_width: float = 0.6, capsize: float = 5, 
     color_bar: str = "auto", bar_colors = None, cmap=plt.colormaps['viridis'],
     annotate: bool = True, annotate_fmt: str = "{m:.2f} ± {e:.2f}",
@@ -254,15 +255,177 @@ def plot_bars(df: pd.DataFrame, identifier: str = "identifier", iv: str = "srs",
     # ax.legend([], [f"Errors: {err_note}"], fontsize=fontsize * 0.8, title_fontsize=fontsize)
     
     # 创建一个 "H" 形误差棒图例符号
+    if error_handle_label is None:
+        error_handle_label=f'Errors {err_note}'
+    else: 
+        error_handle_label=error_handle_label
+        
     error_handle = mlines.Line2D([], [], color='black',
                                  marker='_', markersize=3,   # 控制端帽长度
                                  markeredgewidth=10,          # 控制端帽线宽
                                  linestyle='-', linewidth=1.5,  # 中间竖线
-                                 label=f'Errors {err_note}')
+                                 label=error_handle_label)
     
     ax.legend(handles=[error_handle], fontsize=fontsize * 0.8, title_fontsize=fontsize)    
     
     fig.tight_layout()
+    plt.show()
+
+# p-values
+from scipy.stats import t as student_t
+def estimate_p_matrix_from_summary(
+    df: pd.DataFrame,
+    identifier: str = "identifier",
+    iv: str = "srs",
+    mean_col: str = "data",
+    std_col: str = "stds",
+    n: int = 30,
+    two_tailed: bool = True,
+) -> dict[float, pd.DataFrame]:
+    p_matrices: dict[float, pd.DataFrame] = {}
+
+    for iv_value, sub in df.groupby(iv):
+        # 以 identifier 为 index，方便取值
+        sub = sub.set_index(identifier)
+        methods = list(sub.index)
+
+        # 提取均值和标准差向量
+        means = sub[mean_col].astype(float)
+        stds = sub[std_col].astype(float)
+
+        k = len(methods)
+        p_mat = np.full((k, k), np.nan, dtype=float)
+
+        for i in range(k):
+            for j in range(i + 1, k):
+                m1, m2 = means.iloc[i], means.iloc[j]
+                s1, s2 = stds.iloc[i], stds.iloc[j]
+
+                # 标准误差
+                se = np.sqrt(s1**2 / n + s2**2 / n)
+                if se == 0:
+                    p = np.nan
+                else:
+                    t_stat = (m1 - m2) / se
+
+                    # Welch–Satterthwaite 近似自由度
+                    v1 = s1**2 / n
+                    v2 = s2**2 / n
+                    df_welch = (v1 + v2) ** 2 / (
+                        (v1**2) / (n - 1) + (v2**2) / (n - 1)
+                    )
+
+                    # 双侧 or 单侧 p 值
+                    if two_tailed:
+                        p = 2 * (1 - student_t.cdf(abs(t_stat), df_welch))
+                    else:
+                        p = 1 - student_t.cdf(abs(t_stat), df_welch)
+
+                p_mat[i, j] = p
+                p_mat[j, i] = p  # 对称
+
+        p_df = pd.DataFrame(p_mat, index=methods, columns=methods)
+        p_matrices[iv_value] = p_df
+
+    return p_matrices
+
+def p_to_star(p):
+    if p < 0.001:
+        return "***"
+    elif p < 0.01:
+        return "**"
+    elif p < 0.05:
+        return "*"
+    else:
+        return "ns"
+
+import seaborn as sns
+def plot_p_matrix_with_trend(
+    df,
+    identifier="identifier",
+    mean_col="data",
+    std_col="stds",
+    iv="srs",
+    n=30,
+    srs_value=1.0,
+    cmap="RdBu_r",
+    figsize=(12, 10),
+    fontsize=12
+):
+    """
+    使用 estimate_p_matrix_from_summary() 的结果，
+    直接绘制：p 值 + 趋势 Δ 的组合热图。
+    """
+
+    # ---- STEP 1: 只选定某个 SR（通常为 SR=1.0 或你指定的 srs_value） ----
+    sub = df[df[iv] == srs_value].copy()
+    sub = sub.set_index(identifier)
+    methods = sub.index.tolist()
+
+    # 提取均值
+    means = sub[mean_col].astype(float)
+
+    # ---- STEP 2: 计算 Δmean 矩阵 ----
+    k = len(methods)
+    delta_mat = np.zeros((k, k))
+
+    for i in range(k):
+        for j in range(k):
+            delta_mat[i, j] = means.iloc[j] - means.iloc[i]   # Δ = mean_j - mean_i
+
+    # ---- STEP 3: 计算 p 值矩阵（Welch）----
+    from scipy.stats import t as student_t
+
+    p_mat = np.full((k, k), np.nan)
+    stds = sub[std_col].astype(float)
+
+    for i in range(k):
+        for j in range(i + 1, k):
+            m1, m2 = means.iloc[i], means.iloc[j]
+            s1, s2 = stds.iloc[i], stds.iloc[j]
+
+            se = np.sqrt(s1**2/n + s2**2/n)
+            t_stat = (m1 - m2) / se
+
+            v1 = s1**2 / n
+            v2 = s2**2 / n
+            dfw = (v1 + v2)**2 / ((v1**2)/(n-1) + (v2**2)/(n-1))
+
+            p = 2 * (1 - student_t.cdf(abs(t_stat), dfw))
+
+            p_mat[i, j] = p
+            p_mat[j, i] = p
+
+    # ---- STEP 4: 合成文本（趋势 + 显著性）----
+    annot = np.empty((k, k), dtype=object)
+    for i in range(k):
+        for j in range(k):
+            if i == j:
+                annot[i, j] = ""
+            else:
+                delta = delta_mat[i, j]
+                sign = "↑" if delta > 0 else "↓"
+                stars = p_to_star(p_mat[i, j])
+                annot[i, j] = f"{sign} {abs(delta):.2f}\n{stars}"
+
+    # ---- STEP 5: 绘图 ----
+    plt.figure(figsize=figsize)
+    sns.heatmap(
+        delta_mat,
+        cmap=cmap,
+        annot=annot,
+        fmt="",
+        xticklabels=methods,
+        yticklabels=methods,
+        center=0,
+        square=True,
+        cbar_kws={"label": f"Δ({mean_col})"}
+    )
+
+    plt.title(f"P-value Matrix + Trend Δ ({mean_col}) at SR={srs_value}", fontsize=fontsize+4)
+    plt.xticks(rotation=45, ha="right", fontsize=fontsize)
+    plt.yticks(fontsize=fontsize)
+    plt.tight_layout()
     plt.show()
 
 # %% -----------------------------
@@ -408,8 +571,26 @@ def mbpe_partia(feature='pcc', model='basic'):
               ylabel="BPE (Balanced Performance Efficiency) (%)", xlabel="FN Recovery Methods",
               xtick_rotation=30, wrap_width=30, figsize=(10,10), lower_limit=70, hatchs=hatchs)
     
-    return df_augmented
-
+    df_simple = df_augmented.groupby('identifier').first().reset_index()
+    
+    # test; p-values
+    p_matrix = estimate_p_matrix_from_summary(df_simple, mean_col='MBPEs', std_col='MBPE_stds', n=30)
+    
+    plot_p_matrix_with_trend(
+        df_simple,
+        identifier="identifier",
+        mean_col="MBPEs",
+        std_col="MBPE_stds",
+        iv="srs",
+        n=30,
+        srs_value=1.0,
+        cmap="RdBu_r",
+        figsize=(12, 10),
+        fontsize=12
+    )
+    
+    return df_augmented, p_matrix
+    
 # %% -----------------------------
 def accuracy_selected():
     # color bars; plot settings
@@ -564,15 +745,15 @@ def mbpe_appendix(method='glf',feature='pcc'):
 
 # %% main
 if __name__ == "__main__":
-    # partia
+    # partia_basic
     accuracy_pcc, f1score_pcc = accuracy_partia('pcc')
     df_sbpe = sbpe_partia('pcc')
-    df_mbpe = mbpe_partia('pcc')
+    df_mbpe, p1 = mbpe_partia('pcc')
     
-    # partia
+    # partia_advanced
     accuracy_pcc, f1score_pcc = accuracy_partia('pcc', 'advanced')
     df_sbpe = sbpe_partia('pcc', 'advanced')
-    df_mbpe = mbpe_partia('pcc', 'advanced')
+    df_mbpe, p2 = mbpe_partia('pcc', 'advanced')
     
     # selected
     # acc, f1 = accuracy_selected()

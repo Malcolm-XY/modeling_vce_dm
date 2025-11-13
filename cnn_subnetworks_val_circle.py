@@ -333,28 +333,17 @@ if __name__ == '__main__':
     selection_rate_list = [1, 0.75, 0.5, 0.3, 0.2, 0.1, 0.05]
     
     for selection_rate in selection_rate_list:
-        # Basic
-        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', model_rcm='linear', 
+        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', # 'basic'; 'advanced'
+                                                    model_rcm='linear', # 'linear'; 'linear_ratio'
                                                     feature_cm='pcc', subject_range=range(6, 16), 
                                                     subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
                                                     selection_rate=selection_rate, save=True)
         
-        cnn_subnetworks_evaluation_circle_competing(model_config='basic', 
-                                                    feature_cm='pcc', subject_range=range(6,16),
-                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
-                                                    selection_rate=selection_rate, save=True)
-        
-        # Advance
-        cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='advanced', model_rcm='linear_ratio', 
-                                                    feature_cm='pcc', subject_range=range(6, 16), 
-                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
-                                                    selection_rate=selection_rate, save=True)
-        
-        cnn_subnetworks_evaluation_circle_competing(model_config='advanced', 
+        cnn_subnetworks_evaluation_circle_competing(model_config='basic', # 'basic'; 'advanced'
                                                     feature_cm='pcc', subject_range=range(6,16),
                                                     subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
                                                     selection_rate=selection_rate, save=True)
         
     # %% End
     from cnn_val_circle import end_program_actions
-    end_program_actions(play_sound=True, shutdown=True, countdown_seconds=120)
+    end_program_actions(play_sound=True, shutdown=False, countdown_seconds=120)
