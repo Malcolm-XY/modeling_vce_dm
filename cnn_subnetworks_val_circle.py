@@ -333,15 +333,17 @@ if __name__ == '__main__':
     selection_rate_list = [1, 0.75, 0.5, 0.3, 0.2, 0.1, 0.05]
     
     for selection_rate in selection_rate_list:
+        # DM-RCs
         cnn_subnetworks_eval_circle_rcm_intergrated(model_fm='basic', # 'basic'; 'advanced'
                                                     model_rcm='linear', # 'linear'; 'linear_ratio'
                                                     feature_cm='pcc', subject_range=range(6, 16), 
-                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
+                                                    subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
                                                     selection_rate=selection_rate, save=True)
         
+        # Competing; GLF
         cnn_subnetworks_evaluation_circle_competing(model_config='basic', # 'basic'; 'advanced'
                                                     feature_cm='pcc', subject_range=range(6,16),
-                                                    subnetworks_extract='unify_index', # 'unify_index'; 'separate_index'
+                                                    subnetworks_extract='separate_index', # 'unify_index'; 'separate_index'
                                                     selection_rate=selection_rate, save=True)
         
     # %% End
