@@ -1228,10 +1228,10 @@ if __name__ == '__main__':
     _, cis_sorted = process_optimized_channel_importances(cis_fitted_with_initial_reference, channel_manual_remove)
     
     # %% Save
-    path_currebt = os.getcwd()
-    results_path = os.path.join(os.getcwd(), 'fitted_results')
-    save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
-    save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    # path_currebt = os.getcwd()
+    # results_path = os.path.join(os.getcwd(), 'fitted_results')
+    # save_fitted_results(results_best, results_path, f'fitted_results({fm_model}_fm_{rcm_model}_rcm).xlsx')
+    # save_channel_importances(cis_sorted, results_path, f'channel_importances({fm_model}_fm_{rcm_model}_rcm).xlsx')
     
     # %% Validation of Fitted Comparison
     # joint scatter
